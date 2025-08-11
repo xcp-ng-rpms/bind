@@ -1,0 +1,5176 @@
+From a86e8e75d0ac3266756df18575e16baff7743ccd Mon Sep 17 00:00:00 2001
+From: Evan Hunt <each@isc.org>
+Date: Mon, 28 Sep 2015 23:12:35 -0700
+Subject: [PATCH] merge dyndb
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+4224.	[func]		Added support for "dyndb", a new interface for loading
+			zone data from an external database, developed by
+			Red Hat for the FreeIPA project.
+
+			DynDB drivers fully implement the BIND database
+			API, and are capable of significantly better
+			performance and functionality than DLZ drivers,
+			while taking advantage of advanced database
+			features not available in BIND such as multi-master
+			replication.
+
+			Thanks to Adam Tkac and Petr Spacek of Red Hat.
+			[RT #35271]
+
+(cherry picked from commit a00f9e2f50675bd43cc6a9fe2669709162a2ccb4)
+
+Make backport compilable
+
+add missing libraries
+
+(cherry picked from commit ac6bb3dd36149bc51e0367eba7c50e15dc076c9b)
+
+(cherry picked from commit ab8b419a797fae25f441273aca3ec18d8d0c1106)
+
+address linking issues
+
+(cherry picked from commit 1a0e5b0504576a17a99817d9eef10c4937ef0d63)
+
+silence compiler warnings
+
+(cherry picked from commit 0d990f57aefcb3a2e82a91367fc600ccf69eea63)
+
+remove deadcode; move NULL assignment arlier
+
+(cherry picked from commit 30f8d5e386a283c7e3a24683b78e489881c16c34)
+
+Updated WIN32 files (rt40877)
+Use only differences in dyndb files, do not update win32 projects
+
+(cherry picked from commit 343aeac7176d28c4a1b9d246b1f7311b4cd5da7d)
+
+remove unnecessary return
+
+(cherry picked from commit 7f79448198139145cebc2540188b16b1861b98c5)
+
+add missing dependancy
+
+(cherry picked from commit 97e9fc9e53039c141e1a14adab0865a04225848a)
+
+4386.[bug]Remove shadowed overmem function/variable. [RT #42706]
+
+(cherry picked from commit 96beefd76f597b77d4fcd51f8d766e5e59a2d216)
+
+update dyndb_init inline documentationi [RT #43050]
+
+(cherry picked from commit 8c2c6b8b42766c8221c79bd43680dbfbaed17147)
+
+[master] fix dyndb issues; isc_errno_toresult()
+
+4445.	[cleanup]	isc_errno_toresult() can now be used to call the
+			formerly private function isc__errno2result().
+			[RT #43050]
+
+4444.	[bug]		Fixed some issues related to dyndb: A bug caused
+			braces to be omitted when passing configuration text
+			from named.conf to a dyndb driver, and there was a
+			use-after-free in the sample dyndb driver. [RT #43050]
+
+Patch for dyndb driver submitted by Petr Spacek at Red Hat.
+
+(cherry picked from commit 3390d74e33385337631b19e68760025e0ca5d6ec)
+
+[master] pass source file and line to dyndb load function
+
+4455.	[cleanup]	Allow dyndb modules to correctly log the filename
+			and line number when processing configuration text
+			from named.conf. [RT #43050]
+
+(cherry picked from commit 02fb764681d145e4607c59280a48617013e886ac)
+
+install isc/errno.h
+
+(cherry picked from commit dec17fb66215d0b02ff9a5810658cdcd0215d240)
+
+4493.   [bug]           bin/tests/system/dyndb/driver/Makefile.in should use
+                        SO_TARGETS. [RT# 43336]
+
+(cherry picked from commit c910fc24ce2aad5fa9e9a2d304f818fd8e996e6f)
+
+Include dyndb in tests building
+
+(picked by hand from master commit 93c211afc97e7a072c12ef346581065e4065ff15)
+
+Do not test type of a pointer
+
+Skip DEEPBIND - works only with shared library, but works. And fix dyndb test
+
+Backported to 9.9.4
+
+Include commandline.c in export libraries
+
+Signed-off-by: Petr MenÅ¡Ã­k <pemensik@redhat.com>
+---
+ COPYRIGHT                                 |  17 +-
+ bin/named/Makefile.in                     |   3 +-
+ bin/named/main.c                          |   1 +
+ bin/named/server.c                        |  68 ++-
+ bin/tests/Makefile.in                     |   2 -
+ bin/tests/system/Makefile.in              |   2 +-
+ bin/tests/system/checkconf/good.conf      |   9 +
+ bin/tests/system/conf.sh.in               |   4 +-
+ bin/tests/system/dlzexternal/tests.sh     |   2 -
+ bin/tests/system/dyndb/Makefile.in        |  26 +
+ bin/tests/system/dyndb/clean.sh           |  25 +
+ bin/tests/system/dyndb/driver/.gitignore  |   1 +
+ bin/tests/system/dyndb/driver/AUTHORS     |   8 +
+ bin/tests/system/dyndb/driver/COPYING     |  15 +
+ bin/tests/system/dyndb/driver/Makefile.in |  60 +++
+ bin/tests/system/dyndb/driver/README      |  65 +++
+ bin/tests/system/dyndb/driver/db.c        | 848 ++++++++++++++++++++++++++++++
+ bin/tests/system/dyndb/driver/db.h        |  15 +
+ bin/tests/system/dyndb/driver/driver.c    | 143 +++++
+ bin/tests/system/dyndb/driver/instance.c  | 161 ++++++
+ bin/tests/system/dyndb/driver/instance.h  |  47 ++
+ bin/tests/system/dyndb/driver/lock.c      |  56 ++
+ bin/tests/system/dyndb/driver/lock.h      |  17 +
+ bin/tests/system/dyndb/driver/log.c       |  21 +
+ bin/tests/system/dyndb/driver/log.h       |  27 +
+ bin/tests/system/dyndb/driver/syncptr.c   | 265 ++++++++++
+ bin/tests/system/dyndb/driver/syncptr.h   |  15 +
+ bin/tests/system/dyndb/driver/util.h      |  57 ++
+ bin/tests/system/dyndb/driver/zone.c      | 192 +++++++
+ bin/tests/system/dyndb/driver/zone.h      |  15 +
+ bin/tests/system/dyndb/ns1/named.conf     |  42 ++
+ bin/tests/system/dyndb/prereq.sh          |  21 +
+ bin/tests/system/dyndb/tests.sh           | 155 ++++++
+ configure                                 |   7 +-
+ configure.in                              |   3 +
+ doc/arm/Bv9ARM-book.xml                   |   2 +
+ doc/arm/dyndb.xml                         | 105 ++++
+ lib/dns/Makefile.in                       |   8 +-
+ lib/dns/dlz.c                             |  64 +--
+ lib/dns/dyndb.c                           | 486 +++++++++++++++++
+ lib/dns/include/dns/Makefile.in           |   4 +-
+ lib/dns/include/dns/dyndb.h               | 166 ++++++
+ lib/dns/include/dns/log.h                 |   1 +
+ lib/dns/include/dns/types.h               |   1 +
+ lib/dns/lib.c                             |   4 +-
+ lib/dns/log.c                             |   1 +
+ lib/dns/win32/libdns.def                  |   4 +
+ lib/export/isc/Makefile.in                |   6 +-
+ lib/isc/Makefile.in                       |   8 +-
+ lib/isc/commandline.c                     |  60 +++
+ lib/isc/hash.c                            |  28 +-
+ lib/isc/include/isc/Makefile.in           |   4 +-
+ lib/isc/include/isc/commandline.h         |  18 +-
+ lib/isc/include/isc/errno.h               |  25 +
+ lib/isc/include/isc/hash.h                |   4 +-
+ lib/isc/include/isc/lex.h                 |  21 +-
+ lib/isc/lex.c                             | 110 +++-
+ lib/isc/tests/Makefile.in                 |  11 +-
+ lib/isc/tests/errno_test.c                | 102 ++++
+ lib/isc/unix/Makefile.in                  |   8 +-
+ lib/isc/unix/errno.c                      |  21 +
+ lib/isc/unix/errno2result.c               |  14 +-
+ lib/isc/unix/errno2result.h               |   7 +-
+ lib/isc/win32/Makefile.in                 |   8 +-
+ lib/isc/win32/errno.c                     |  18 +
+ lib/isc/win32/errno2result.c              |  14 +-
+ lib/isc/win32/errno2result.h              |   5 +-
+ lib/isc/win32/libisc.def                  |   2 +
+ lib/isc/win32/libisc.dsp                  |   8 +
+ lib/isc/win32/libisc.mak                  |  23 +
+ lib/isc/win32/socket.c                    |   4 +-
+ lib/isccfg/include/isccfg/grammar.h       |   1 +
+ lib/isccfg/namedconf.c                    |  18 +
+ lib/isccfg/parser.c                       |  46 ++
+ 74 files changed, 3703 insertions(+), 152 deletions(-)
+ create mode 100644 bin/tests/system/dyndb/Makefile.in
+ create mode 100644 bin/tests/system/dyndb/clean.sh
+ create mode 100644 bin/tests/system/dyndb/driver/.gitignore
+ create mode 100644 bin/tests/system/dyndb/driver/AUTHORS
+ create mode 100644 bin/tests/system/dyndb/driver/COPYING
+ create mode 100644 bin/tests/system/dyndb/driver/Makefile.in
+ create mode 100644 bin/tests/system/dyndb/driver/README
+ create mode 100644 bin/tests/system/dyndb/driver/db.c
+ create mode 100644 bin/tests/system/dyndb/driver/db.h
+ create mode 100644 bin/tests/system/dyndb/driver/driver.c
+ create mode 100644 bin/tests/system/dyndb/driver/instance.c
+ create mode 100644 bin/tests/system/dyndb/driver/instance.h
+ create mode 100644 bin/tests/system/dyndb/driver/lock.c
+ create mode 100644 bin/tests/system/dyndb/driver/lock.h
+ create mode 100644 bin/tests/system/dyndb/driver/log.c
+ create mode 100644 bin/tests/system/dyndb/driver/log.h
+ create mode 100644 bin/tests/system/dyndb/driver/syncptr.c
+ create mode 100644 bin/tests/system/dyndb/driver/syncptr.h
+ create mode 100644 bin/tests/system/dyndb/driver/util.h
+ create mode 100644 bin/tests/system/dyndb/driver/zone.c
+ create mode 100644 bin/tests/system/dyndb/driver/zone.h
+ create mode 100644 bin/tests/system/dyndb/ns1/named.conf
+ create mode 100644 bin/tests/system/dyndb/prereq.sh
+ create mode 100644 bin/tests/system/dyndb/tests.sh
+ create mode 100644 doc/arm/dyndb.xml
+ create mode 100644 lib/dns/dyndb.c
+ create mode 100644 lib/dns/include/dns/dyndb.h
+ create mode 100644 lib/isc/include/isc/errno.h
+ create mode 100644 lib/isc/tests/errno_test.c
+ create mode 100644 lib/isc/unix/errno.c
+ create mode 100644 lib/isc/win32/errno.c
+
+diff --git a/COPYRIGHT b/COPYRIGHT
+index 525c222..137db13 100644
+--- a/COPYRIGHT
++++ b/COPYRIGHT
+@@ -161,7 +161,7 @@ POSSIBILITY OF SUCH DAMAGE.
+ 
+  -----------------------------------------------------------------------------
+ 
+-Copyright (c) 1997 - 2003 Kungliga Tekniska Högskolan
++Copyright (c) 1997 - 2003 Kungliga Tekniska HÃ¶gskolan
+ (Royal Institute of Technology, Stockholm, Sweden). 
+ All rights reserved. 
+ 
+@@ -516,3 +516,18 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
++-----------------------------------------------------------------------------
++
++Copyright (C) 2008-2011  Red Hat, Inc.
++
++Permission to use, copy, modify, and/or distribute this software for any
++purpose with or without fee is hereby granted, provided that the above
++copyright notice and this permission notice appear in all copies.
++
++THE SOFTWARE IS PROVIDED "AS IS" AND Red Hat DISCLAIMS ALL WARRANTIES WITH
++REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++AND FITNESS.  IN NO EVENT SHALL Red Hat BE LIABLE FOR ANY SPECIAL, DIRECT,
++INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++PERFORMANCE OF THIS SOFTWARE.
+diff --git a/bin/named/Makefile.in b/bin/named/Makefile.in
+index cd65777..8ec9ad7 100644
+--- a/bin/named/Makefile.in
++++ b/bin/named/Makefile.in
+@@ -13,8 +13,6 @@
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+-# $Id: Makefile.in,v 1.116 2011/03/10 23:47:49 tbox Exp $
+-
+ srcdir =	@srcdir@
+ VPATH =		@srcdir@
+ top_srcdir =	@top_srcdir@
+@@ -138,6 +136,7 @@ config.@O@: config.c bind.keys.h
+ 	${LIBTOOL_MODE_COMPILE} ${CC} ${ALL_CFLAGS} \
+ 		-DVERSION=\"${VERSION}\" \
+ 		-DSRCID=\"${SRCID}\" \
++		-DDYNDB_LIBDIR=\"@libdir@/bind\" \
+ 		-DNS_LOCALSTATEDIR=\"${localstatedir}\" \
+ 		-DNS_SYSCONFDIR=\"${sysconfdir}\" \
+ 		-c ${srcdir}/config.c
+diff --git a/bin/named/main.c b/bin/named/main.c
+index 6e12847..d26783f 100644
+--- a/bin/named/main.c
++++ b/bin/named/main.c
+@@ -45,6 +45,7 @@
+ #include <isccc/result.h>
+ 
+ #include <dns/dispatch.h>
++#include <dns/dyndb.h>
+ #include <dns/name.h>
+ #include <dns/result.h>
+ #include <dns/view.h>
+diff --git a/bin/named/server.c b/bin/named/server.c
+index daa5b0e..6260f8f 100644
+--- a/bin/named/server.c
++++ b/bin/named/server.c
+@@ -30,6 +30,7 @@
+ 
+ #include <isc/app.h>
+ #include <isc/base64.h>
++#include <isc/commandline.h>
+ #include <isc/dir.h>
+ #include <isc/entropy.h>
+ #include <isc/file.h>
+@@ -64,6 +65,7 @@
+ #include <dns/dispatch.h>
+ #include <dns/dlz.h>
+ #include <dns/dns64.h>
++#include <dns/dyndb.h>
+ #include <dns/forward.h>
+ #include <dns/journal.h>
+ #include <dns/keytable.h>
+@@ -1243,6 +1245,33 @@ configure_peer(const cfg_obj_t *cpeer, isc_mem_t *mctx, dns_peer_t **peerp) {
+ }
+ 
+ static isc_result_t
++configure_dyndb(const cfg_obj_t *dyndb, isc_mem_t *mctx,
++		const dns_dyndbctx_t *dctx)
++{
++	isc_result_t result = ISC_R_SUCCESS;
++	const cfg_obj_t *obj;
++	const char *name, *library;
++
++	/* Get the name of the dyndb instance and the library path . */
++	name = cfg_obj_asstring(cfg_tuple_get(dyndb, "name"));
++	library = cfg_obj_asstring(cfg_tuple_get(dyndb, "library"));
++
++	obj = cfg_tuple_get(dyndb, "parameters");
++	if (obj != NULL)
++		result = dns_dyndb_load(library, name, cfg_obj_asstring(obj),
++					cfg_obj_file(obj), cfg_obj_line(obj),
++					mctx, dctx);
++
++	if (result != ISC_R_SUCCESS)
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++		              NS_LOGMODULE_SERVER, ISC_LOG_ERROR,
++		              "dynamic database '%s' configuration failed: %s",
++		              name, isc_result_totext(result));
++	return (result);
++}
++
++
++static isc_result_t
+ disable_algorithms(const cfg_obj_t *disabled, dns_resolver_t *resolver) {
+ 	isc_result_t result;
+ 	const cfg_obj_t *algorithms;
+@@ -2058,6 +2087,7 @@ configure_view(dns_view_t *view, cfg_obj_t *config, cfg_obj_t *vconfig,
+ 	const cfg_obj_t *dlz;
+ 	unsigned int dlzargc;
+ 	char **dlzargv;
++	const cfg_obj_t *dyndb_list;
+ 	const cfg_obj_t *disabled;
+ 	const cfg_obj_t *obj;
+ 	const cfg_listelt_t *element;
+@@ -2097,6 +2127,7 @@ configure_view(dns_view_t *view, cfg_obj_t *config, cfg_obj_t *vconfig,
+ 	unsigned int query_timeout, ndisp;
+ 	struct cfg_context *nzctx;
+ 	dns_rpz_zone_t *rpz;
++	dns_dyndbctx_t *dctx = NULL;
+ 
+ 	REQUIRE(DNS_VIEW_VALID(view));
+ 
+@@ -2317,7 +2348,8 @@ configure_view(dns_view_t *view, cfg_obj_t *config, cfg_obj_t *vconfig,
+ 				goto cleanup;
+ 			}
+ 
+-			result = dns_dlzstrtoargv(mctx, s, &dlzargc, &dlzargv);
++			result = isc_commandline_strtoargv(mctx, s, &dlzargc,
++							   &dlzargv, 0);
+ 			if (result != ISC_R_SUCCESS) {
+ 				isc_mem_free(mctx, s);
+ 				goto cleanup;
+@@ -3261,6 +3293,31 @@ configure_view(dns_view_t *view, cfg_obj_t *config, cfg_obj_t *vconfig,
+ 		dns_view_setrootdelonly(view, ISC_FALSE);
+ 
+ 	/*
++	 * Load DynDB modules.
++	 */
++	dyndb_list = NULL;
++	if (voptions != NULL)
++		(void)cfg_map_get(voptions, "dyndb", &dyndb_list);
++	else
++		(void)cfg_map_get(config, "dyndb", &dyndb_list);
++
++	for (element = cfg_list_first(dyndb_list);
++	     element != NULL;
++	     element = cfg_list_next(element))
++	{
++		const cfg_obj_t *dyndb = cfg_listelt_value(element);
++
++		if (dctx == NULL)
++			CHECK(dns_dyndb_createctx(mctx, isc_hashctx,
++						  ns_g_lctx, view,
++						  ns_g_server->zonemgr,
++						  ns_g_server->task,
++						  ns_g_timermgr, &dctx));
++
++		CHECK(configure_dyndb(dyndb, mctx, dctx));
++	}
++
++	/*
+ 	 * Setup automatic empty zones.  If recursion is off then
+ 	 * they are disabled by default.
+ 	 */
+@@ -3445,6 +3502,8 @@ configure_view(dns_view_t *view, cfg_obj_t *config, cfg_obj_t *vconfig,
+ 
+ 	if (cache != NULL)
+ 		dns_cache_detach(&cache);
++	if (dctx != NULL)
++		dns_dyndb_destroyctx(&dctx);
+ 
+ 	return (result);
+ }
+@@ -4915,6 +4974,11 @@ load_configuration(const char *filename, ns_server_t *server,
+ 	CHECK(cfg_aclconfctx_create(ns_g_mctx, &ns_g_aclconfctx));
+ 
+ 	/*
++	 * Shut down all dyndb instances.
++	 */
++	dns_dyndb_cleanup(ISC_FALSE);
++
++	/*
+ 	 * Parse the global default pseudo-config file.
+ 	 */
+ 	if (first_time) {
+@@ -6043,6 +6107,8 @@ shutdown_server(isc_task_t *task, isc_event_t *event) {
+ 			dns_view_detach(&view);
+ 	}
+ 
++	dns_dyndb_cleanup(ISC_TRUE);
++
+ 	while ((nsc = ISC_LIST_HEAD(server->cachelist)) != NULL) {
+ 		ISC_LIST_UNLINK(server->cachelist, nsc, link);
+ 		dns_cache_detach(&nsc->cache);
+diff --git a/bin/tests/Makefile.in b/bin/tests/Makefile.in
+index 2020bf4..8477ae5 100644
+--- a/bin/tests/Makefile.in
++++ b/bin/tests/Makefile.in
+@@ -13,8 +13,6 @@
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+-# $Id: Makefile.in,v 1.145 2011/02/03 05:41:53 marka Exp $
+-
+ srcdir =	@srcdir@
+ VPATH =		@srcdir@
+ top_srcdir =	@top_srcdir@
+diff --git a/bin/tests/system/Makefile.in b/bin/tests/system/Makefile.in
+index f7bcc26..af8b82c 100644
+--- a/bin/tests/system/Makefile.in
++++ b/bin/tests/system/Makefile.in
+@@ -21,7 +21,7 @@ top_srcdir =	@top_srcdir@
+ 
+ @BIND9_MAKE_INCLUDES@
+ 
+-SUBDIRS =	dlzexternal filter-aaaa lwresd rpz rrl \
++SUBDIRS =	dlzexternal dyndb filter-aaaa lwresd rpz rrl \
+ 		rsabigexponent tkey tsiggss
+ TARGETS =
+ 
+diff --git a/bin/tests/system/checkconf/good.conf b/bin/tests/system/checkconf/good.conf
+index 5444fdd..a6310cd 100644
+--- a/bin/tests/system/checkconf/good.conf
++++ b/bin/tests/system/checkconf/good.conf
+@@ -104,3 +104,12 @@ view "second" {
+ 	dnssec-validation auto;
+ 	zone-statistics full;
+ };
++dyndb "name" "library.so" {
++        this;
++        \};
++        is a {
++                "test" { \{ of; the; };
++        } bracketed;
++        "text \"";
++        system;
++};
+diff --git a/bin/tests/system/conf.sh.in b/bin/tests/system/conf.sh.in
+index c40e8f1..eb02236 100644
+--- a/bin/tests/system/conf.sh.in
++++ b/bin/tests/system/conf.sh.in
+@@ -60,8 +60,8 @@ SAMPLE=$TOP/lib/export/samples/sample
+ # v6synth
+ SUBDIRS="acl additional allow_query addzone autosign builtin
+ 	 cacheclean checkconf @CHECKDS@ checknames checkzone @COVERAGE@
+-         database dlv dlvauto dlz dlzexternal dname dns64 dnssec ecdsa
+-         formerr forward glue gost ixfr inline limits logfileconfig
++         database dlv dlvauto dlz dlzexternal dname dns64 dnssec dyndb
++         ecdsa formerr forward glue gost ixfr inline limits logfileconfig
+          lwresd masterfile masterformat metadata notify nsupdate pending
+ 	 @PKCS11_TEST@ redirect resolver rndc rpz rrl rrsetorder rsabigexponent
+ 	 smartsign sortlist spf staticstub stub tkey tsig tsiggss unknown
+diff --git a/bin/tests/system/dlzexternal/tests.sh b/bin/tests/system/dlzexternal/tests.sh
+index bd2eeac..103d4c9 100644
+--- a/bin/tests/system/dlzexternal/tests.sh
++++ b/bin/tests/system/dlzexternal/tests.sh
+@@ -1,6 +1,4 @@
+ #!/bin/sh
+-# tests for TSIG-GSS updates
+-
+ SYSTEMTESTTOP=..
+ . $SYSTEMTESTTOP/conf.sh
+ 
+diff --git a/bin/tests/system/dyndb/Makefile.in b/bin/tests/system/dyndb/Makefile.in
+new file mode 100644
+index 0000000..c7792f2
+--- /dev/null
++++ b/bin/tests/system/dyndb/Makefile.in
+@@ -0,0 +1,26 @@
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++srcdir =	@srcdir@
++VPATH =		@srcdir@
++top_srcdir =	@top_srcdir@
++
++@BIND9_VERSION@
++
++@BIND9_MAKE_INCLUDES@
++
++SUBDIRS =	driver
++TARGETS =
++
++@BIND9_MAKE_RULES@
+diff --git a/bin/tests/system/dyndb/clean.sh b/bin/tests/system/dyndb/clean.sh
+new file mode 100644
+index 0000000..2273396
+--- /dev/null
++++ b/bin/tests/system/dyndb/clean.sh
+@@ -0,0 +1,25 @@
++#!/bin/sh
++#
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++#
++# Clean up after dyndb tests.
++#
++rm -f ns1/named.memstats
++rm -f ns1/update.txt
++rm -f added.a.out.*
++rm -f added.ptr.out.*
++rm -f deleted.a.out.*
++rm -f deleted.ptr.out.*
+diff --git a/bin/tests/system/dyndb/driver/.gitignore b/bin/tests/system/dyndb/driver/.gitignore
+new file mode 100644
+index 0000000..c3af857
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/.gitignore
+@@ -0,0 +1 @@
++lib/
+diff --git a/bin/tests/system/dyndb/driver/AUTHORS b/bin/tests/system/dyndb/driver/AUTHORS
+new file mode 100644
+index 0000000..acc109c
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/AUTHORS
+@@ -0,0 +1,8 @@
++This sample driver is based on bind-dyndb-ldap project and small portions
++of code from ISC BIND 9.10.
++
++Authors listed in alphabetical order:
++Adam Tkac   <atkac@redhat.com>
++Jiri Kuncar <jkuncar@redhat.com>
++Martin Nagy <mnagy@redhat.com>
++Petr Spacek <pspacek@redhat.com>
+diff --git a/bin/tests/system/dyndb/driver/COPYING b/bin/tests/system/dyndb/driver/COPYING
+new file mode 100644
+index 0000000..08d4d77
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/COPYING
+@@ -0,0 +1,15 @@
++Copyright (C) 2009-2015  Red Hat
++Copyright (C) 2004-2014  Internet Systems Consortium, Inc. ("ISC")
++Copyright (C) 1999-2003  Internet Software Consortium.
++
++Permission to use, copy, modify, and/or distribute this software for any
++purpose with or without fee is hereby granted, provided that the above
++copyright notice and this permission notice appear in all copies.
++
++THE SOFTWARE IS PROVIDED "AS IS" AND AUTHORS DISCLAIMS ALL WARRANTIES WITH
++REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++PERFORMANCE OF THIS SOFTWARE.
+diff --git a/bin/tests/system/dyndb/driver/Makefile.in b/bin/tests/system/dyndb/driver/Makefile.in
+new file mode 100644
+index 0000000..e23c563
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/Makefile.in
+@@ -0,0 +1,60 @@
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++srcdir =	@srcdir@
++VPATH =		@srcdir@
++top_srcdir =	@top_srcdir@
++
++@BIND9_MAKE_INCLUDES@
++
++CINCLUDES =	${DNS_INCLUDES} ${ISC_INCLUDES}
++
++CDEFINES =
++CWARNINGS =
++
++DNSLIBS =	../../../../../lib/dns/libdns.@A@
++ISCLIBS =	../../../../../lib/isc/libisc.@A@
++
++DNSDEPLIBS =	../../../../../lib/dns/libdns.@A@
++ISCDEPLIBS =	../../../../../lib/isc/libisc.@A@
++
++DEPLIBS =	${DNSDEPLIBS} ${ISCDEPLIBS}
++
++LIBS =		${DNSLIBS} ${ISCLIBS} @LIBS@
++
++
++SRCS =		db.c driver.c instance.c \
++		lock.c log.c syncptr.c zone.c
++
++OBJS =		db.@O@ driver.@O@ instance.@O@ \
++		lock.@O@ log.@O@ syncptr.@O@ zone.@O@
++
++SO_TARGETS =	lib/sample.@SO@
++TARGETS =	@SO_TARGETS@
++
++@BIND9_MAKE_RULES@
++
++CFLAGS =	@CFLAGS@ @SO_CFLAGS@
++SO_LDFLAGS =	@LDFLAGS@
++
++lib/sample.@SO@: sample.@SO@
++	$(SHELL) ${top_srcdir}/mkinstalldirs `pwd`/lib
++	${LIBTOOL_MODE_INSTALL} ${INSTALL} sample.@SO@ `pwd`/lib
++
++sample.@SO@: ${OBJS} ${DNSDEPLIBS} ${ISCDEPLIBS}
++	${LIBTOOL_MODE_LINK} @SO_LD@ ${SO_LDFLAGS} -o $@ ${OBJS} \
++		${DNSLIBS} ${ISCLIBS} @DNS_CRYPTO_LIBS@ ${LIBS}
++
++clean distclean::
++	rm -f ${OBJS} sample.so lib/sample.so
+diff --git a/bin/tests/system/dyndb/driver/README b/bin/tests/system/dyndb/driver/README
+new file mode 100644
+index 0000000..9aac0a6
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/README
+@@ -0,0 +1,65 @@
++To use the Dynamic DB sample driver, run named and check the log.
++
++    $ cd testing
++    $ named -gc named.conf
++
++You should be able to see something like:
++
++zone test/IN: loaded serial 0
++zone arpa/IN: loaded serial 0
++
++This means that the sample driver created empty zones "test." and
++"arpa." as defined by "arg" parameters in named.conf.
++
++$ dig @localhost test.
++
++should work as usual and you should be able to see the dummy zone with
++NS record pointing to the zone apex and A record with 127.0.0.1:
++
++;; ANSWER SECTION:
++test.			86400	IN	A	127.0.0.1
++test.			86400	IN	NS	test.
++test.			86400	IN	SOA	test. test. 0 28800 7200 604800 86400
++
++This driver creates two empty zones and allows query/transfer/update to
++all IP addresses for demonstration purposes.
++
++The driver wraps the RBT database implementation used natively by BIND,
++and modifies the addrdataset() and substractrdataset() functions to do
++additional work during dynamic updates.
++
++A dynamic update modifies the target zone as usual. After that, the
++driver detects whether the modified RR was of type A or AAAA, and if so,
++attempts to appropriately generate or delete a matching PTR record in
++one of the two zones managed by the driver.
++
++E.g.:
++
++$ nsupdate
++> update add a.test. 300 IN A 192.0.2.1
++> send
++
++will add the A record
++a.test.			300	IN	A	192.0.2.1
++
++and also automatically generate the PTR record
++1.2.0.192.in-addr.arpa.	300	IN	PTR	a.test.
++
++AXFR and RR deletion via dynamic updates should work as usual. Deletion
++of a type A or AAAA record should delete the corresponding PTR record
++too.
++
++The zone is stored only in memory, and all changes will be lost on
++reload/reconfig.
++
++Hints for code readers:
++- Driver initialization starts in driver.c: dyndb_init() function.
++- New database implementation is registered by calling dns_db_register()
++  and passing a function pointer to it. This sample uses the function
++  create_db() to initialize the database.
++- Zones are created later in instance.c: load_sample_instance_zones().
++- Database entry points are in structure db.c: dns_dbmethods_t
++  sampledb_methods
++- sampledb_methods points to an implementation of the database interface.
++  See the db.c: addrdataset() implementation and look at how the RBT
++  database instance is wrapped into an additional layer of logic.
+diff --git a/bin/tests/system/dyndb/driver/db.c b/bin/tests/system/dyndb/driver/db.c
+new file mode 100644
+index 0000000..d2ca023
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/db.c
+@@ -0,0 +1,848 @@
++/*
++ * Database API implementation. The interface is defined in lib/dns/db.h.
++ *
++ * dns_db_*() calls on database instances backed by this driver use
++ * struct sampledb_methods to find appropriate function implementation.
++ *
++ * This example re-uses RBT DB implementation from original BIND and blindly
++ * proxies most of dns_db_*() calls to this underlying RBT DB.
++ * See struct sampledb below.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++#include <config.h>
++
++#include <isc/string.h>
++
++#include <dns/db.h>
++#include <dns/diff.h>
++#include <dns/enumclass.h>
++#include <dns/rbt.h>
++#include <dns/rdatalist.h>
++#include <dns/rdatastruct.h>
++#include <dns/soa.h>
++#include <dns/types.h>
++
++#include "db.h"
++#include "instance.h"
++#include "syncptr.h"
++#include "util.h"
++
++#define SAMPLEDB_MAGIC			ISC_MAGIC('S', 'M', 'D', 'B')
++#define VALID_SAMPLEDB(sampledb) \
++	((sampledb) != NULL && (sampledb)->common.impmagic == SAMPLEDB_MAGIC)
++
++struct sampledb {
++	dns_db_t			common;
++	isc_refcount_t			refs;
++	sample_instance_t		*inst;
++
++	/*
++	 * Internal RBT database implementation provided by BIND.
++	 * Most dns_db_* calls (find(), createiterator(), etc.)
++	 * are blindly forwarded to this RBT DB.
++	 */
++	dns_db_t			*rbtdb;
++};
++
++typedef struct sampledb sampledb_t;
++
++/*
++ * Get full DNS name from the node.
++ *
++ * @warning
++ * The code silently expects that "node" came from RBTDB and thus
++ * assumption dns_dbnode_t (from RBTDB) == dns_rbtnode_t is correct.
++ *
++ * This should work as long as we use only RBTDB and nothing else.
++ */
++static isc_result_t
++sample_name_fromnode(dns_dbnode_t *node, dns_name_t *name) {
++	dns_rbtnode_t *rbtnode = (dns_rbtnode_t *) node;
++	return (dns_rbt_fullnamefromnode(rbtnode, name));
++}
++
++static void
++attach(dns_db_t *source, dns_db_t **targetp) {
++	sampledb_t *sampledb = (sampledb_t *)source;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	isc_refcount_increment(&sampledb->refs, NULL);
++	*targetp = source;
++}
++
++static void
++free_sampledb(sampledb_t *sampledb) {
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_detach(&sampledb->rbtdb);
++	dns_name_free(&sampledb->common.origin, sampledb->common.mctx);
++	isc_mem_putanddetach(&sampledb->common.mctx, sampledb, sizeof(*sampledb));
++}
++
++static void
++detach(dns_db_t **dbp) {
++	sampledb_t *sampledb = (sampledb_t *)(*dbp);
++	unsigned int refs;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	isc_refcount_decrement(&sampledb->refs, &refs);
++	if (refs == 0)
++		free_sampledb(sampledb);
++	*dbp = NULL;
++}
++
++/*
++ * This method should never be called, because DB is "persistent".
++ * See ispersistent() function. It means that database do not need to be
++ * loaded in the usual sense.
++ */
++static isc_result_t
++beginload(dns_db_t *db, dns_addrdatasetfunc_t *addp, dns_dbload_t **dbloadp) {
++	UNUSED(db);
++	UNUSED(addp);
++	UNUSED(dbloadp);
++
++	fatal_error("current implementation should never call beginload()");
++
++	/* Not reached */
++	return (ISC_R_SUCCESS);
++}
++
++/*
++ * This method should never be called, because DB is "persistent".
++ * See ispersistent() function. It means that database do not need to be
++ * loaded in the usual sense.
++ */
++static isc_result_t
++endload(dns_db_t *db, dns_dbload_t **dbloadp) {
++	UNUSED(db);
++	UNUSED(dbloadp);
++
++	fatal_error("current implementation should never call endload()");
++
++	/* Not reached */
++	return (ISC_R_SUCCESS);
++}
++
++#if 0
++static isc_result_t
++serialize(dns_db_t *db, dns_dbversion_t *version, FILE *file) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_serialize(sampledb->rbtdb, version, file));
++}
++#endif
++
++static isc_result_t
++dump(dns_db_t *db, dns_dbversion_t *version, const char *filename,
++     dns_masterformat_t masterformat)
++{
++
++	UNUSED(db);
++	UNUSED(version);
++	UNUSED(filename);
++	UNUSED(masterformat);
++
++	fatal_error("current implementation should never call dump()");
++
++	/* Not reached */
++	return (ISC_R_SUCCESS);
++}
++
++static void
++currentversion(dns_db_t *db, dns_dbversion_t **versionp) {
++	sampledb_t *sampledb = (sampledb_t *)db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_currentversion(sampledb->rbtdb, versionp);
++}
++
++static isc_result_t
++newversion(dns_db_t *db, dns_dbversion_t **versionp) {
++	sampledb_t *sampledb = (sampledb_t *)db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_newversion(sampledb->rbtdb, versionp));
++}
++
++static void
++attachversion(dns_db_t *db, dns_dbversion_t *source,
++	      dns_dbversion_t **targetp)
++{
++	sampledb_t *sampledb = (sampledb_t *)db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_attachversion(sampledb->rbtdb, source, targetp);
++}
++
++static void
++closeversion(dns_db_t *db, dns_dbversion_t **versionp, isc_boolean_t commit) {
++	sampledb_t *sampledb = (sampledb_t *)db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_closeversion(sampledb->rbtdb, versionp, commit);
++}
++
++static isc_result_t
++findnode(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
++	 dns_dbnode_t **nodep)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findnode(sampledb->rbtdb, name, create, nodep));
++}
++
++static isc_result_t
++find(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
++     dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
++     dns_dbnode_t **nodep, dns_name_t *foundname, dns_rdataset_t *rdataset,
++     dns_rdataset_t *sigrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_find(sampledb->rbtdb, name, version, type,
++			    options, now, nodep, foundname,
++			    rdataset, sigrdataset));
++}
++
++static isc_result_t
++findzonecut(dns_db_t *db, dns_name_t *name, unsigned int options,
++	    isc_stdtime_t now, dns_dbnode_t **nodep, dns_name_t *foundname,
++	    dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findzonecut(sampledb->rbtdb, name, options,
++				   now, nodep, foundname, rdataset,
++				   sigrdataset));
++}
++
++static void
++attachnode(dns_db_t *db, dns_dbnode_t *source, dns_dbnode_t **targetp) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_attachnode(sampledb->rbtdb, source, targetp);
++
++}
++
++static void
++detachnode(dns_db_t *db, dns_dbnode_t **targetp) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_detachnode(sampledb->rbtdb, targetp);
++}
++
++static isc_result_t
++expirenode(dns_db_t *db, dns_dbnode_t *node, isc_stdtime_t now) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_expirenode(sampledb->rbtdb, node, now));
++}
++
++static void
++printnode(dns_db_t *db, dns_dbnode_t *node, FILE *out) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_printnode(sampledb->rbtdb, node, out);
++}
++
++static isc_result_t
++createiterator(dns_db_t *db, unsigned int options,
++	       dns_dbiterator_t **iteratorp)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_createiterator(sampledb->rbtdb, options, iteratorp));
++}
++
++static isc_result_t
++findrdataset(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
++	     dns_rdatatype_t type, dns_rdatatype_t covers, isc_stdtime_t now,
++	     dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findrdataset(sampledb->rbtdb, node, version, type,
++				    covers, now, rdataset, sigrdataset));
++}
++
++static isc_result_t
++allrdatasets(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
++	     isc_stdtime_t now, dns_rdatasetiter_t **iteratorp)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_allrdatasets(sampledb->rbtdb, node, version,
++				    now, iteratorp));
++}
++
++static isc_result_t
++addrdataset(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
++	    isc_stdtime_t now, dns_rdataset_t *rdataset, unsigned int options,
++	    dns_rdataset_t *addedrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++	isc_result_t result;
++	dns_fixedname_t name;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_fixedname_init(&name);
++	CHECK(dns_db_addrdataset(sampledb->rbtdb, node, version, now,
++				 rdataset, options, addedrdataset));
++	if (rdataset->type == dns_rdatatype_a ||
++	    rdataset->type == dns_rdatatype_aaaa) {
++		CHECK(sample_name_fromnode(node, dns_fixedname_name(&name)));
++		CHECK(syncptrs(sampledb->inst, dns_fixedname_name(&name),
++			       rdataset, DNS_DIFFOP_ADD));
++	}
++
++cleanup:
++	return (result);
++}
++
++static isc_result_t
++subtractrdataset(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
++		 dns_rdataset_t *rdataset, unsigned int options,
++		 dns_rdataset_t *newrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++	isc_result_t result;
++	dns_fixedname_t name;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_fixedname_init(&name);
++	result = dns_db_subtractrdataset(sampledb->rbtdb, node, version,
++					 rdataset, options, newrdataset);
++	if (result != ISC_R_SUCCESS && result != DNS_R_NXRRSET)
++		goto cleanup;
++
++	if (rdataset->type == dns_rdatatype_a ||
++	    rdataset->type == dns_rdatatype_aaaa) {
++		CHECK(sample_name_fromnode(node, dns_fixedname_name(&name)));
++		CHECK(syncptrs(sampledb->inst, dns_fixedname_name(&name),
++			       rdataset, DNS_DIFFOP_DEL));
++	}
++
++cleanup:
++	return (result);
++}
++
++/*
++ * deleterdataset() function is not used during DNS update processing so syncptr
++ * implementation is left as an exercise to the reader.
++ */
++static isc_result_t
++deleterdataset(dns_db_t *db, dns_dbnode_t *node, dns_dbversion_t *version,
++	       dns_rdatatype_t type, dns_rdatatype_t covers)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_deleterdataset(sampledb->rbtdb, node, version,
++				      type, covers));
++}
++
++static isc_boolean_t
++issecure(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_issecure(sampledb->rbtdb));
++}
++
++static unsigned int
++nodecount(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_nodecount(sampledb->rbtdb));
++}
++
++/*
++ * The database does not need to be loaded from disk or written to disk.
++ * Always return ISC_TRUE.
++ */
++static isc_boolean_t
++ispersistent(dns_db_t *db) {
++	UNUSED(db);
++
++	return (ISC_TRUE);
++}
++
++static void
++overmem(dns_db_t *db, isc_boolean_t over) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_overmem(sampledb->rbtdb, over);
++}
++
++static void
++settask(dns_db_t *db, isc_task_t *task) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_settask(sampledb->rbtdb, task);
++}
++
++static isc_result_t
++getoriginnode(dns_db_t *db, dns_dbnode_t **nodep) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_getoriginnode(sampledb->rbtdb, nodep));
++}
++
++static void
++transfernode(dns_db_t *db, dns_dbnode_t **sourcep, dns_dbnode_t **targetp) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_transfernode(sampledb->rbtdb, sourcep, targetp);
++
++}
++
++static isc_result_t
++getnsec3parameters(dns_db_t *db, dns_dbversion_t *version,
++			  dns_hash_t *hash, isc_uint8_t *flags,
++			  isc_uint16_t *iterations,
++			  unsigned char *salt, size_t *salt_length)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_getnsec3parameters(sampledb->rbtdb, version,
++					  hash, flags, iterations,
++					  salt, salt_length));
++
++}
++
++static isc_result_t
++findnsec3node(dns_db_t *db, dns_name_t *name, isc_boolean_t create,
++	      dns_dbnode_t **nodep)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findnsec3node(sampledb->rbtdb, name, create, nodep));
++}
++
++static isc_result_t
++setsigningtime(dns_db_t *db, dns_rdataset_t *rdataset, isc_stdtime_t resign)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_setsigningtime(sampledb->rbtdb, rdataset, resign));
++}
++
++static isc_result_t
++getsigningtime(dns_db_t *db, dns_rdataset_t *rdataset, dns_name_t *name)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_getsigningtime(sampledb->rbtdb, rdataset, name));
++}
++
++static void
++resigned(dns_db_t *db, dns_rdataset_t *rdataset, dns_dbversion_t *version) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_resigned(sampledb->rbtdb, rdataset, version);
++}
++
++static isc_boolean_t
++isdnssec(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_isdnssec(sampledb->rbtdb));
++}
++
++static dns_stats_t *
++getrrsetstats(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_getrrsetstats(sampledb->rbtdb));
++
++}
++
++static isc_result_t
++rpz_enabled(dns_db_t *db, dns_rpz_st_t *st) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return dns_db_rpz_enabled(sampledb->rbtdb, st);
++}
++
++static void
++rpz_findips(dns_rpz_zone_t *rpz, dns_rpz_type_t rpz_type,
++		   dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *version,
++		   dns_rdataset_t *ardataset, dns_rpz_st_t *st,
++		   dns_name_t *query_qname) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_rpz_findips(rpz, rpz_type, zone, db, version, ardataset, st, query_qname);
++}
++
++#if 0
++static void
++rpz_attach(dns_db_t *db, dns_rpz_zones_t *rpzs, dns_rpz_num_t rpz_num) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	dns_db_rpz_attach(sampledb->rbtdb, rpzs, rpz_num);
++}
++
++static isc_result_t
++rpz_ready(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_rpz_ready(sampledb->rbtdb));
++}
++#endif
++
++static isc_result_t
++findnodeext(dns_db_t *db, dns_name_t *name,
++	    isc_boolean_t create, dns_clientinfomethods_t *methods,
++	    dns_clientinfo_t *clientinfo, dns_dbnode_t **nodep)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findnodeext(sampledb->rbtdb, name, create,
++				   methods, clientinfo, nodep));
++}
++
++static isc_result_t
++findext(dns_db_t *db, dns_name_t *name, dns_dbversion_t *version,
++	dns_rdatatype_t type, unsigned int options, isc_stdtime_t now,
++	dns_dbnode_t **nodep, dns_name_t *foundname,
++	dns_clientinfomethods_t *methods, dns_clientinfo_t *clientinfo,
++	dns_rdataset_t *rdataset, dns_rdataset_t *sigrdataset)
++{
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_findext(sampledb->rbtdb, name, version, type,
++			       options, now, nodep, foundname, methods,
++			       clientinfo, rdataset, sigrdataset));
++}
++
++#if 0
++static isc_result_t
++setcachestats(dns_db_t *db, isc_stats_t *stats) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_setcachestats(sampledb->rbtdb, stats));
++}
++
++static unsigned int
++hashsize(dns_db_t *db) {
++	sampledb_t *sampledb = (sampledb_t *) db;
++
++	REQUIRE(VALID_SAMPLEDB(sampledb));
++
++	return (dns_db_hashsize(sampledb->rbtdb));
++}
++#endif
++
++/*
++ * DB interface definition. Database driver uses this structure to
++ * determine which implementation of dns_db_*() function to call.
++ */
++static dns_dbmethods_t sampledb_methods = {
++	attach,
++	detach,
++	beginload,
++	endload,
++//	serialize,
++	dump,
++	currentversion,
++	newversion,
++	attachversion,
++	closeversion,
++	findnode,
++	find,
++	findzonecut,
++	attachnode,
++	detachnode,
++	expirenode,
++	printnode,
++	createiterator,
++	findrdataset,
++	allrdatasets,
++	addrdataset,
++	subtractrdataset,
++	deleterdataset,
++	issecure,
++	nodecount,
++	ispersistent,
++	overmem,
++	settask,
++	getoriginnode,
++	transfernode,
++	getnsec3parameters,
++	findnsec3node,
++	setsigningtime,
++	getsigningtime,
++	resigned,
++	isdnssec,
++	getrrsetstats,
++	rpz_enabled,
++	rpz_findips,
++	findnodeext,
++	findext,
++#if 0
++	setcachestats,
++	hashsize
++#endif
++};
++
++/* Auxiliary driver functions. */
++
++/*
++ * Auxiliary functions add_*() create minimal database which can be loaded.
++ * This is necessary because this driver create empty 'fake' zone which
++ * is not loaded from disk so there is no way for user to supply SOA, NS and A
++ * records.
++ *
++ * Following functions were copied from BIND 9.10.2rc1 named/server.c,
++ * credit goes to ISC.
++ */
++static isc_result_t
++add_soa(dns_db_t *db, dns_dbversion_t *version, dns_name_t *name,
++	dns_name_t *origin, dns_name_t *contact)
++{
++	dns_dbnode_t *node = NULL;
++	dns_rdata_t rdata = DNS_RDATA_INIT;
++	dns_rdatalist_t rdatalist;
++	dns_rdataset_t rdataset;
++	isc_result_t result;
++	unsigned char buf[DNS_SOA_BUFFERSIZE];
++
++	dns_rdataset_init(&rdataset);
++	dns_rdatalist_init(&rdatalist);
++	CHECK(dns_soa_buildrdata(origin, contact, dns_db_class(db),
++				 0, 28800, 7200, 604800, 86400, buf, &rdata));
++	rdatalist.type = rdata.type;
++	rdatalist.covers = 0;
++	rdatalist.rdclass = rdata.rdclass;
++	rdatalist.ttl = 86400;
++	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
++	CHECK(dns_rdatalist_tordataset(&rdatalist, &rdataset));
++	CHECK(dns_db_findnode(db, name, ISC_TRUE, &node));
++	CHECK(dns_db_addrdataset(db, node, version, 0, &rdataset, 0, NULL));
++ cleanup:
++	if (node != NULL)
++		dns_db_detachnode(db, &node);
++	return (result);
++}
++
++
++static isc_result_t
++add_ns(dns_db_t *db, dns_dbversion_t *version, dns_name_t *name,
++       dns_name_t *nsname)
++{
++	dns_dbnode_t *node = NULL;
++	dns_rdata_ns_t ns;
++	dns_rdata_t rdata = DNS_RDATA_INIT;
++	dns_rdatalist_t rdatalist;
++	dns_rdataset_t rdataset;
++	isc_result_t result;
++	isc_buffer_t b;
++	unsigned char buf[DNS_NAME_MAXWIRE];
++
++	isc_buffer_init(&b, buf, sizeof(buf));
++
++	dns_rdataset_init(&rdataset);
++	dns_rdatalist_init(&rdatalist);
++	ns.common.rdtype = dns_rdatatype_ns;
++	ns.common.rdclass = dns_db_class(db);
++	ns.mctx = NULL;
++	dns_name_init(&ns.name, NULL);
++	dns_name_clone(nsname, &ns.name);
++	CHECK(dns_rdata_fromstruct(&rdata, dns_db_class(db), dns_rdatatype_ns,
++				   &ns, &b));
++	rdatalist.type = rdata.type;
++	rdatalist.covers = 0;
++	rdatalist.rdclass = rdata.rdclass;
++	rdatalist.ttl = 86400;
++	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
++	CHECK(dns_rdatalist_tordataset(&rdatalist, &rdataset));
++	CHECK(dns_db_findnode(db, name, ISC_TRUE, &node));
++	CHECK(dns_db_addrdataset(db, node, version, 0, &rdataset, 0, NULL));
++ cleanup:
++	if (node != NULL)
++		dns_db_detachnode(db, &node);
++	return (result);
++}
++
++static isc_result_t
++add_a(dns_db_t *db, dns_dbversion_t *version, dns_name_t *name,
++      struct in_addr addr)
++{
++	dns_dbnode_t *node = NULL;
++	dns_rdata_in_a_t a;
++	dns_rdata_t rdata = DNS_RDATA_INIT;
++	dns_rdatalist_t rdatalist;
++	dns_rdataset_t rdataset;
++	isc_result_t result;
++	isc_buffer_t b;
++	unsigned char buf[DNS_NAME_MAXWIRE];
++
++	isc_buffer_init(&b, buf, sizeof(buf));
++
++	dns_rdataset_init(&rdataset);
++	dns_rdatalist_init(&rdatalist);
++	a.common.rdtype = dns_rdatatype_a;
++	a.common.rdclass = dns_db_class(db);
++	a.in_addr = addr;
++	CHECK(dns_rdata_fromstruct(&rdata, dns_db_class(db), dns_rdatatype_a,
++				   &a, &b));
++	rdatalist.type = rdata.type;
++	rdatalist.covers = 0;
++	rdatalist.rdclass = rdata.rdclass;
++	rdatalist.ttl = 86400;
++	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
++	CHECK(dns_rdatalist_tordataset(&rdatalist, &rdataset));
++	CHECK(dns_db_findnode(db, name, ISC_TRUE, &node));
++	CHECK(dns_db_addrdataset(db, node, version, 0, &rdataset, 0, NULL));
++ cleanup:
++	if (node != NULL)
++		dns_db_detachnode(db, &node);
++	return (result);
++}
++
++/*
++ * Driver-specific implementation of dns_db_create().
++ *
++ * @param[in] argv      Database-specific parameters from dns_db_create().
++ * @param[in] driverarg Driver-specific parameter from dns_db_register().
++ */
++isc_result_t
++create_db(isc_mem_t *mctx, dns_name_t *origin, dns_dbtype_t type,
++	  dns_rdataclass_t rdclass, unsigned int argc, char *argv[],
++	  void *driverarg, dns_db_t **dbp)
++{
++	sampledb_t *sampledb = NULL;
++	isc_result_t result;
++	dns_dbversion_t *version = NULL;
++	struct in_addr a_addr;
++
++	REQUIRE(type == dns_dbtype_zone);
++	REQUIRE(rdclass == dns_rdataclass_in);
++	REQUIRE(argc == 0);
++	REQUIRE(argv != NULL);
++	REQUIRE(driverarg != NULL); /* pointer to driver instance */
++	REQUIRE(dbp != NULL && *dbp == NULL);
++
++	UNUSED(driverarg); /* no driver-specific configuration */
++
++	a_addr.s_addr = 0x0100007fU;
++
++	CHECKED_MEM_GET_PTR(mctx, sampledb);
++	ZERO_PTR(sampledb);
++
++	isc_mem_attach(mctx, &sampledb->common.mctx);
++	dns_name_init(&sampledb->common.origin, NULL);
++	isc_ondestroy_init(&sampledb->common.ondest);
++
++	sampledb->common.magic = DNS_DB_MAGIC;
++	sampledb->common.impmagic = SAMPLEDB_MAGIC;
++
++	sampledb->common.methods = &sampledb_methods;
++	sampledb->common.attributes = 0;
++	sampledb->common.rdclass = rdclass;
++
++	CHECK(dns_name_dupwithoffsets(origin, mctx, &sampledb->common.origin));
++
++	CHECK(isc_refcount_init(&sampledb->refs, 1));
++
++	/* Translate instance name to instance pointer. */
++	sampledb->inst = driverarg;
++
++	/* Create internal instance of RBT DB implementation from BIND. */
++	CHECK(dns_db_create(mctx, "rbt", origin, dns_dbtype_zone,
++			    dns_rdataclass_in, 0, NULL, &sampledb->rbtdb));
++
++	/* Create fake SOA, NS, and A records to make database loadable. */
++	CHECK(dns_db_newversion(sampledb->rbtdb, &version));
++	CHECK(add_soa(sampledb->rbtdb, version, origin, origin, origin));
++	CHECK(add_ns(sampledb->rbtdb, version, origin, origin));
++	CHECK(add_a(sampledb->rbtdb, version, origin, a_addr));
++	dns_db_closeversion(sampledb->rbtdb, &version, ISC_TRUE);
++
++	*dbp = (dns_db_t *)sampledb;
++
++	return (ISC_R_SUCCESS);
++
++cleanup:
++	if (sampledb != NULL) {
++		if (dns_name_dynamic(&sampledb->common.origin))
++			dns_name_free(&sampledb->common.origin, mctx);
++
++		isc_mem_putanddetach(&sampledb->common.mctx, sampledb,
++				     sizeof(*sampledb));
++	}
++
++	return (result);
++}
+diff --git a/bin/tests/system/dyndb/driver/db.h b/bin/tests/system/dyndb/driver/db.h
+new file mode 100644
+index 0000000..80693a7
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/db.h
+@@ -0,0 +1,15 @@
++/**
++ * Database API implementation.
++ *
++ * Copyright (C) 2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef DB_H_
++#define DB_H_
++
++isc_result_t
++create_db(isc_mem_t *mctx, dns_name_t *origin, dns_dbtype_t type,
++	  dns_rdataclass_t rdclass, unsigned int argc, char *argv[],
++	  void *driverarg, dns_db_t **dbp);
++
++#endif /* DB_H_ */
+diff --git a/bin/tests/system/dyndb/driver/driver.c b/bin/tests/system/dyndb/driver/driver.c
+new file mode 100644
+index 0000000..11e6743
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/driver.c
+@@ -0,0 +1,143 @@
++/*
++ * Driver API implementation and main entry point for BIND.
++ *
++ * BIND calls dyndb_version() before loading, dyndb_init() during startup
++ * and dyndb_destroy() during shutdown.
++ *
++ * It is completely up to implementation what to do.
++ *
++ * dyndb <name> <driver> {} sections in named.conf are independent so
++ * driver init() and destroy() functions are called independently for
++ * each section even if they reference the same driver/library. It is
++ * up to driver implementation to detect and catch this situation if
++ * it is undesirable.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/commandline.h>
++#include <isc/hash.h>
++#include <isc/mem.h>
++#include <isc/lib.h>
++#include <isc/util.h>
++#include <isc/log.h>
++
++#include <dns/db.h>
++#include <dns/dyndb.h>
++#include <dns/lib.h>
++#include <dns/types.h>
++
++#include "db.h"
++#include "log.h"
++#include "instance.h"
++#include "util.h"
++
++dns_dyndb_destroy_t dyndb_destroy;
++dns_dyndb_register_t dyndb_init;
++dns_dyndb_version_t dyndb_version;
++
++/*
++ * Driver init is called for each dyndb section in named.conf
++ * once during startup and then again on every reload.
++ *
++ * @code
++ * dyndb example-name "sample.so" { param1 param2 };
++ * @endcode
++ * 
++ * @param[in] name        User-defined string from dyndb "name" {}; definition
++ *                        in named.conf.
++ *                        The example above will have name = "example-name".
++ * @param[in] parameters  User-defined parameters from dyndb section as one
++ *                        string. The example above will have
++ *                        params = "param1 param2";
++ * @param[in] file	  The name of the file from which the parameters
++ *                        were read.
++ * @param[in] line	  The line number from which the parameters were read.
++ * @param[out] instp      Pointer to instance-specific data
++ *                        (for one dyndb section).
++ */
++isc_result_t
++dyndb_init(isc_mem_t *mctx, const char *name, const char *parameters,
++	   const char *file, unsigned long line,
++	   const dns_dyndbctx_t *dctx, void **instp)
++{
++	isc_result_t result;
++	unsigned int argc;
++	char **argv = NULL;
++	char *s = NULL;
++	sample_instance_t *sample_inst = NULL;
++
++	REQUIRE(name != NULL);
++	REQUIRE(dctx != NULL);
++
++	/*
++	 * Depending on how dlopen() was called, we may not have
++	 * access to named's global namespace, in which case we need
++	 * to initialize libisc/libdns
++	 */
++	if (dctx->refvar != &isc_lctx) {
++		isc_log_setcontext(dctx->lctx);
++		dns_log_setcontext(dctx->lctx);
++	}
++
++	if (isc_hashctx != NULL && isc_hashctx != dctx->hctx)
++		isc_hash_ctxdetach(&isc_hashctx);
++	isc_hashctx = dctx->hctx;
++
++	s = isc_mem_strdup(mctx, parameters);
++	if (s == NULL) {
++		result = ISC_R_NOMEMORY;
++		goto cleanup;
++	}
++
++	result = isc_commandline_strtoargv(mctx, s, &argc, &argv, 0);
++	if (result != ISC_R_SUCCESS)
++		goto cleanup;
++
++	log_write(ISC_LOG_DEBUG(9),
++		  "loading params for dyndb '%s' from %s:%lu",
++		  name, file, line);
++
++	/* Finally, create the instance. */
++	CHECK(new_sample_instance(mctx, name, argc, argv, dctx, &sample_inst));
++
++	/*
++	 * This is an example so we create and load zones
++	 * right now.  This step can be arbitrarily postponed.
++	 */
++	CHECK(load_sample_instance_zones(sample_inst));
++
++	*instp = sample_inst;
++
++ cleanup:
++	if (s != NULL)
++		isc_mem_free(mctx, s);
++	if (argv != NULL)
++		isc_mem_put(mctx, argv, argc * sizeof(*argv));
++
++	return (result);
++}
++
++/*
++ * Driver destroy is called for every instance on every reload and then once
++ * during shutdown.
++ *
++ * @param[out] instp Pointer to instance-specific data (for one dyndb section).
++ */
++void
++dyndb_destroy(void **instp) {
++	destroy_sample_instance((sample_instance_t **)instp);
++}
++
++/*
++ * Driver version is called when loading the driver to ensure there
++ * is no API mismatch betwen the driver and the caller.
++ */
++int
++dyndb_version(unsigned int *flags) {
++	UNUSED(flags);
++
++	return (DNS_DYNDB_VERSION);
++}
+diff --git a/bin/tests/system/dyndb/driver/instance.c b/bin/tests/system/dyndb/driver/instance.c
+new file mode 100644
+index 0000000..f2207b9
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/instance.c
+@@ -0,0 +1,161 @@
++/*
++ * Driver instance object.
++ *
++ * One instance is equivalent to dynamic-db section in named.conf.
++ * This module parses arguments and provide high-level operations
++ * instance init/zone load/instance destroy.
++ *
++ * Copyright (C) 2008-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/task.h>
++#include <isc/util.h>
++
++#include <dns/db.h>
++#include <dns/dyndb.h>
++#include <dns/fixedname.h>
++#include <dns/name.h>
++#include <dns/view.h>
++#include <dns/zone.h>
++
++#include "db.h"
++#include "util.h"
++#include "instance.h"
++#include "log.h"
++#include "zone.h"
++
++/*
++ * Parse parameters and convert them to zone names. Caller has to deallocate
++ * resulting DNS names.
++ *
++ * @param[in]  argv NULL-terminated string array of length 2 (excluding NULL)
++ * 		    Each string has to be a valid DNS name.
++ * @param[out] z1   Zone name from argv[0]
++ * @param[out] z2   Zone name from argv[1]
++ */
++static isc_result_t
++parse_params(isc_mem_t *mctx, int argc, char **argv,
++	     dns_name_t *z1, dns_name_t *z2)
++{
++	isc_result_t result;
++	int i;
++
++	REQUIRE(argv != NULL);
++	REQUIRE(z1 != NULL);
++	REQUIRE(z2 != NULL);
++
++	for (i = 0; i < argc; i++) {
++		log_info("param: '%s'", argv[i]);
++	}
++	log_info("number of params: %d", i);
++
++	if (argc != 2) {
++		log_error("exactly two parameters "
++			  "(absolute zone names) are required");
++		result = ISC_R_FAILURE;
++		goto cleanup;
++	}
++	CHECK(dns_name_fromstring2(z1, argv[0], dns_rootname, 0, mctx));
++	CHECK(dns_name_fromstring2(z2, argv[1], dns_rootname, 0, mctx));
++
++	result = ISC_R_SUCCESS;
++
++cleanup:
++	return (result);
++}
++
++/*
++ * Initialize new driver instance. It will not create zones until
++ * load_sample_instance_zones() is called.
++ */
++isc_result_t
++new_sample_instance(isc_mem_t *mctx, const char *db_name,
++		    int argc, char **argv, const dns_dyndbctx_t *dctx,
++		    sample_instance_t **sample_instp)
++{
++	isc_result_t result;
++	sample_instance_t *inst = NULL;
++
++	REQUIRE(sample_instp != NULL && *sample_instp == NULL);
++
++	CHECKED_MEM_GET_PTR(mctx, inst);
++	ZERO_PTR(inst);
++	isc_mem_attach(mctx, &inst->mctx);
++
++	inst->db_name = isc_mem_strdup(mctx, db_name);
++	if (inst->db_name == NULL) {
++		result = ISC_R_NOMEMORY;
++		goto cleanup;
++	}
++
++	dns_fixedname_init(&inst->zone1_fn);
++	inst->zone1_name = dns_fixedname_name(&inst->zone1_fn);
++
++	dns_fixedname_init(&inst->zone2_fn);
++	inst->zone2_name = dns_fixedname_name(&inst->zone2_fn);
++
++	CHECK(parse_params(mctx, argc, argv,
++			   inst->zone1_name, inst->zone2_name));
++
++	dns_view_attach(dctx->view, &inst->view);
++	dns_zonemgr_attach(dctx->zmgr, &inst->zmgr);
++	isc_task_attach(dctx->task, &inst->task);
++
++	/* Register new DNS DB implementation. */
++	CHECK(dns_db_register(db_name, create_db, inst, mctx, &inst->db_imp));
++
++	*sample_instp = inst;
++	result = ISC_R_SUCCESS;
++
++cleanup:
++	if (result != ISC_R_SUCCESS)
++		destroy_sample_instance(&inst);
++	return (result);
++}
++
++/*
++ * Create empty zones, add fake SOA, NS, and A records, load fake zones
++ * and add them to inst->view.
++ */
++isc_result_t
++load_sample_instance_zones(sample_instance_t *inst) {
++	isc_result_t result;
++
++	CHECK(create_zone(inst, inst->zone1_name, &inst->zone1));
++	CHECK(activate_zone(inst, inst->zone1));
++
++	CHECK(create_zone(inst, inst->zone2_name, &inst->zone2));
++	CHECK(activate_zone(inst, inst->zone2));
++
++cleanup:
++	return (result);
++}
++
++void
++destroy_sample_instance(sample_instance_t **instp) {
++	sample_instance_t *inst;
++	REQUIRE(instp != NULL);
++
++	inst = *instp;
++	if (inst == NULL)
++		return;
++
++	if (inst->db_name != NULL)
++		isc_mem_free(inst->mctx, inst->db_name);
++	if (inst->zone1 != NULL)
++		dns_zone_detach(&inst->zone1);
++	if (inst->zone2 != NULL)
++		dns_zone_detach(&inst->zone2);
++	if (inst->db_imp != NULL)
++		dns_db_unregister(&inst->db_imp);
++
++	dns_view_detach(&inst->view);
++	dns_zonemgr_detach(&inst->zmgr);
++	isc_task_detach(&inst->task);
++
++	MEM_PUT_AND_DETACH(inst);
++
++	*instp = NULL;
++}
+diff --git a/bin/tests/system/dyndb/driver/instance.h b/bin/tests/system/dyndb/driver/instance.h
+new file mode 100644
+index 0000000..ff0f5c3
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/instance.h
+@@ -0,0 +1,47 @@
++/**
++ * Driver instance object.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef _LD_INSTANCE_H_
++#define _LD_INSTANCE_H_
++
++#include <dns/fixedname.h>
++#include <dns/name.h>
++#include <dns/types.h>
++
++struct sample_instance {
++	isc_mem_t		*mctx;
++	char			*db_name;
++	dns_dbimplementation_t	*db_imp;
++
++	/* These are needed for zone creation. */
++	dns_view_t		*view;
++	dns_zonemgr_t		*zmgr;
++	isc_task_t		*task;
++	isc_boolean_t		exiting;
++
++	dns_zone_t		*zone1;
++	dns_fixedname_t		zone1_fn;
++	dns_name_t		*zone1_name;
++
++	dns_zone_t		*zone2;
++	dns_fixedname_t		zone2_fn;
++	dns_name_t		*zone2_name;
++};
++
++typedef struct sample_instance sample_instance_t;
++
++isc_result_t
++new_sample_instance(isc_mem_t *mctx, const char *db_name,
++		  int argc, char **argv, const dns_dyndbctx_t *dctx,
++		  sample_instance_t **sample_instp);
++
++isc_result_t
++load_sample_instance_zones(sample_instance_t *inst);
++
++void
++destroy_sample_instance(sample_instance_t **sample_instp);
++
++#endif /* !_LD_INSTANCE_H_ */
+diff --git a/bin/tests/system/dyndb/driver/lock.c b/bin/tests/system/dyndb/driver/lock.c
+new file mode 100644
+index 0000000..c97c490
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/lock.c
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (C) 2014-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/task.h>
++#include <isc/util.h>
++
++#include "lock.h"
++
++/*
++ * Lock BIND dispatcher and allow only single task to run.
++ *
++ * @warning
++ * All calls to isc_task_beginexclusive() have to operate on the same task
++ * otherwise it would not be possible to distinguish recursive locking
++ * from real conflict on the dispatcher lock.
++ * For this reason this wrapper function always works with inst->task.
++ * As a result, this function have to be be called only from inst->task.
++ *
++ * Recursive locking is allowed. Auxiliary variable pointed to by "statep"
++ * stores information if last run_exclusive_enter() operation really locked
++ * something or if the lock was called recursively and was no-op.
++ *
++ * The pair (inst, state) used for run_exclusive_enter() has to be
++ * used for run_exclusive_exit().
++ *
++ * @param[in]  	  inst   The instance with the only task which is allowed to run.
++ * @param[in,out] statep Lock state: ISC_R_SUCCESS or ISC_R_LOCKBUSY
++ */
++void
++run_exclusive_enter(sample_instance_t *inst, isc_result_t *statep) {
++	REQUIRE(statep != NULL);
++	REQUIRE(*statep == ISC_R_IGNORE);
++
++	*statep = isc_task_beginexclusive(inst->task);
++	RUNTIME_CHECK(*statep == ISC_R_SUCCESS || *statep == ISC_R_LOCKBUSY);
++}
++
++/*
++ * Exit task-exclusive mode.
++ *
++ * @param[in] inst  The instance used for previous run_exclusive_enter() call.
++ * @param[in] state Lock state as returned by run_exclusive_enter().
++ */
++void
++run_exclusive_exit(sample_instance_t *inst, isc_result_t state) {
++	if (state == ISC_R_SUCCESS)
++		isc_task_endexclusive(inst->task);
++	else
++		/* Unlocking recursive lock or the lock was never locked. */
++		INSIST(state == ISC_R_LOCKBUSY || state == ISC_R_IGNORE);
++
++	return;
++}
+diff --git a/bin/tests/system/dyndb/driver/lock.h b/bin/tests/system/dyndb/driver/lock.h
+new file mode 100644
+index 0000000..35c9c84
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/lock.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (C) 2014-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef LOCK_H_
++#define LOCK_H_
++
++#include "instance.h"
++#include "util.h"
++
++void
++run_exclusive_enter(sample_instance_t *inst, isc_result_t *statep);
++
++void
++run_exclusive_exit(sample_instance_t *inst, isc_result_t state);
++
++#endif /* LOCK_H_ */
+diff --git a/bin/tests/system/dyndb/driver/log.c b/bin/tests/system/dyndb/driver/log.c
+new file mode 100644
+index 0000000..2238c7e
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/log.c
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/util.h>
++
++#include <dns/log.h>
++
++#include "log.h"
++ 
++void
++log_write(int level, const char *format, ...) {
++	va_list args;
++
++	va_start(args, format);
++	isc_log_vwrite(dns_lctx, DNS_LOGCATEGORY_DATABASE, DNS_LOGMODULE_DYNDB,
++		       level, format, args);
++	va_end(args);
++}
+diff --git a/bin/tests/system/dyndb/driver/log.h b/bin/tests/system/dyndb/driver/log.h
+new file mode 100644
+index 0000000..27b38c8
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/log.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2009--2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef _LD_LOG_H_
++#define _LD_LOG_H_
++
++#include <isc/error.h>
++#include <dns/log.h>
++#include <dns/result.h>
++
++#define fatal_error(...) \
++	isc_error_fatal(__FILE__, __LINE__, __VA_ARGS__)
++
++#define log_error_r(fmt, ...) \
++	log_error(fmt ": %s", ##__VA_ARGS__, dns_result_totext(result))
++
++#define log_error(format, ...)	\
++	log_write(ISC_LOG_ERROR, format, ##__VA_ARGS__)
++
++#define log_info(format, ...)	\
++	log_write(ISC_LOG_INFO, format, ##__VA_ARGS__)
++
++void
++log_write(int level, const char *format, ...) ISC_FORMAT_PRINTF(2, 3);
++
++#endif /* !_LD_LOG_H_ */
+diff --git a/bin/tests/system/dyndb/driver/syncptr.c b/bin/tests/system/dyndb/driver/syncptr.c
+new file mode 100644
+index 0000000..2191bae
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/syncptr.c
+@@ -0,0 +1,265 @@
++/*
++ * Automatic A/AAAA/PTR record synchronization.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/event.h>
++#include <isc/eventclass.h>
++#include <isc/netaddr.h>
++#include <isc/task.h>
++
++#include <dns/byaddr.h>
++#include <dns/db.h>
++#include <dns/name.h>
++#include <dns/view.h>
++#include <dns/zone.h>
++
++#include "instance.h"
++#include "syncptr.h"
++#include "util.h"
++
++/* Almost random value. See eventclass.h */
++#define SYNCPTR_WRITE_EVENT (ISC_EVENTCLASS(1025) + 1)
++
++/*
++ * Event used for making changes to reverse zones.
++ */
++typedef struct syncptrevent syncptrevent_t;
++struct syncptrevent {
++	ISC_EVENT_COMMON(syncptrevent_t);
++	isc_mem_t *mctx;
++	dns_zone_t *zone;
++	dns_diff_t diff;
++	dns_fixedname_t ptr_target_name; /* referenced by owner name in tuple */
++	isc_buffer_t b; /* referenced by target name in tuple */
++	unsigned char buf[DNS_NAME_MAXWIRE];
++};
++
++/*
++ * Write diff generated in syncptr() to reverse zone.
++ *
++ * This function will be called asynchronously and syncptr() will not get
++ * any result from it.
++ *
++ */
++static void
++syncptr_write(isc_task_t *task, isc_event_t *event) {
++	syncptrevent_t *pevent = (syncptrevent_t *)event;
++	dns_dbversion_t *version = NULL;
++	dns_db_t *db = NULL;
++	isc_result_t result;
++
++	REQUIRE(event->ev_type == SYNCPTR_WRITE_EVENT);
++
++	UNUSED(task);
++
++	CHECK(dns_zone_getdb(pevent->zone, &db));
++	CHECK(dns_db_newversion(db, &version));
++	CHECK(dns_diff_apply(&pevent->diff, db, version));
++
++cleanup:
++	if (db != NULL) {
++		if (version != NULL)
++			dns_db_closeversion(db, &version, ISC_TRUE);
++		dns_db_detach(&db);
++	}
++	dns_zone_detach(&pevent->zone);
++	dns_diff_clear(&pevent->diff);
++	isc_event_free(&event);
++}
++
++/*
++ * Find a reverse zone for given IP address.
++ *
++ * @param[in]  rdata      IP address as A/AAAA record
++ * @param[out] name       Owner name for the PTR record
++ * @param[out] zone       DNS zone for reverse record matching the IP address
++ *
++ * @retval ISC_R_SUCCESS  DNS name derived from given IP address belongs to an
++ * 			  reverse zone managed by this driver instance.
++ * 			  PTR record synchronization can continue.
++ * @retval ISC_R_NOTFOUND Suitable reverse zone was not found because it
++ * 			  does not exist or is not managed by this driver.
++ */
++static isc_result_t
++syncptr_find_zone(sample_instance_t *inst, dns_rdata_t *rdata,
++		  dns_name_t *name, dns_zone_t **zone)
++{
++	isc_result_t result;
++	isc_netaddr_t isc_ip; /* internal net address representation */
++	dns_rdata_in_a_t ipv4;
++	dns_rdata_in_aaaa_t ipv6;
++
++	REQUIRE(inst != NULL);
++	REQUIRE(zone != NULL && *zone == NULL);
++
++	switch (rdata->type) {
++	case dns_rdatatype_a:
++		CHECK(dns_rdata_tostruct(rdata, &ipv4, inst->mctx));
++		isc_netaddr_fromin(&isc_ip, &ipv4.in_addr);
++		break;
++
++	case dns_rdatatype_aaaa:
++		CHECK(dns_rdata_tostruct(rdata, &ipv6, inst->mctx));
++		isc_netaddr_fromin6(&isc_ip, &ipv6.in6_addr);
++		break;
++
++	default:
++		fatal_error("unsupported address type 0x%x", rdata->type);
++		break;
++	}
++
++	/*
++	 * Convert IP address to PTR owner name.
++	 *
++	 * @example
++	 * 192.168.0.1 -> 1.0.168.192.in-addr.arpa
++	 */
++	CHECK(dns_byaddr_createptrname2(&isc_ip, 0, name));
++
++	/* Find a zone containing owner name of the PTR record. */
++	result = dns_zt_find(inst->view->zonetable, name, 0, NULL, zone);
++	if (result == DNS_R_PARTIALMATCH)
++		result = ISC_R_SUCCESS;
++	else if (result != ISC_R_SUCCESS)
++		goto cleanup;
++
++	/* Make sure that the zone is managed by this driver. */
++	if (*zone != inst->zone1 && *zone != inst->zone2) {
++		dns_zone_detach(zone);
++		result = ISC_R_NOTFOUND;
++	}
++
++cleanup:
++	if (rdata->type == dns_rdatatype_a)
++		dns_rdata_freestruct(&ipv4);
++	else
++		dns_rdata_freestruct(&ipv6);
++
++	return (result);
++}
++
++/*
++ * Generate update event for PTR record to reflect change in A/AAAA record.
++ *
++ * @pre Reverse zone is managed by this driver.
++ *
++ * @param[in]  a_name  DNS domain of modified A/AAAA record
++ * @param[in]  af      Address family
++ * @param[in]  ip_str  IP address as a string (IPv4 or IPv6)
++ * @param[in]  mod_op  LDAP_MOD_DELETE if A/AAAA record is being deleted
++ *                     or LDAP_MOD_ADD if A/AAAA record is being added.
++ *
++ * @retval ISC_R_SUCCESS Event for PTR record update was generated and send.
++ *                       Change to reverse zone will be done asynchronously.
++ * @retval other	 Synchronization failed - reverse doesn't exist,
++ * 			 is not managed by this driver instance,
++ * 			 memory allocation error, etc.
++ */
++static isc_result_t
++syncptr(sample_instance_t *inst, dns_name_t *name,
++	dns_rdata_t *addr_rdata, dns_ttl_t ttl, dns_diffop_t op)
++{
++	isc_result_t result;
++	isc_mem_t *mctx = inst->mctx;
++	dns_fixedname_t ptr_name;
++	dns_zone_t *ptr_zone = NULL;
++	dns_rdata_ptr_t ptr_struct;
++	dns_rdata_t ptr_rdata = DNS_RDATA_INIT;
++	dns_difftuple_t *tp = NULL;
++	isc_task_t *task = NULL;
++	syncptrevent_t *pevent = NULL;
++
++	dns_fixedname_init(&ptr_name);
++	DNS_RDATACOMMON_INIT(&ptr_struct, dns_rdatatype_ptr, dns_rdataclass_in);
++	dns_name_init(&ptr_struct.ptr, NULL);
++
++	pevent = (syncptrevent_t *)isc_event_allocate(inst->mctx, inst,
++						      SYNCPTR_WRITE_EVENT,
++						      syncptr_write, NULL,
++						      sizeof(syncptrevent_t));
++	if (pevent == NULL) {
++		result = ISC_R_NOMEMORY;
++		goto cleanup;
++	}
++	isc_buffer_init(&pevent->b, pevent->buf, sizeof(pevent->buf));
++	dns_fixedname_init(&pevent->ptr_target_name);
++
++	/* Check if reverse zone is managed by this driver */
++	result = syncptr_find_zone(inst, addr_rdata,
++				   dns_fixedname_name(&ptr_name), &ptr_zone);
++	if (result != ISC_R_SUCCESS) {
++		log_error_r("PTR record synchonization skipped: reverse zone "
++			    "is not managed by driver instance '%s'",
++			    inst->db_name);
++		goto cleanup;
++	}
++
++	/* Reverse zone is managed by this driver, prepare PTR record */
++	pevent->zone = NULL;
++	dns_zone_attach(ptr_zone, &pevent->zone);
++	CHECK(dns_name_copy(name, dns_fixedname_name(&pevent->ptr_target_name),
++			    NULL));
++	dns_name_clone(dns_fixedname_name(&pevent->ptr_target_name),
++		       &ptr_struct.ptr);
++	dns_diff_init(inst->mctx, &pevent->diff);
++	CHECK(dns_rdata_fromstruct(&ptr_rdata, dns_rdataclass_in,
++				   dns_rdatatype_ptr, &ptr_struct, &pevent->b));
++
++	/* Create diff */
++	CHECK(dns_difftuple_create(mctx, op, dns_fixedname_name(&ptr_name),
++				   ttl, &ptr_rdata, &tp));
++	dns_diff_append(&pevent->diff, &tp);
++
++	/*
++	 * Send update event to the reverse zone.
++	 * It will be processed asynchronously.
++	 */
++	dns_zone_gettask(ptr_zone, &task);
++	isc_task_send(task, (isc_event_t **)&pevent);
++
++cleanup:
++	if (ptr_zone != NULL)
++		dns_zone_detach(&ptr_zone);
++	if (tp != NULL)
++		dns_difftuple_free(&tp);
++	if (task != NULL)
++		isc_task_detach(&task);
++	if (pevent != NULL)
++		isc_event_free((isc_event_t **)&pevent);
++
++	return (result);
++}
++
++/*
++ * Generate update event for every rdata in rdataset.
++ *
++ * @param[in]  name      Owner name for A/AAAA records in rdataset.
++ * @param[in]  rdataset  A/AAAA records.
++ * @param[in]  op	 DNS_DIFFOP_ADD / DNS_DIFFOP_DEL for adding / deleting
++ * 			 the rdata
++ */
++isc_result_t
++syncptrs(sample_instance_t *inst, dns_name_t *name,
++	 dns_rdataset_t *rdataset, dns_diffop_t op)
++{
++	isc_result_t result;
++	dns_rdata_t rdata = DNS_RDATA_INIT;
++
++	for (result = dns_rdataset_first(rdataset);
++	     result == ISC_R_SUCCESS;
++	     result = dns_rdataset_next(rdataset)) {
++		dns_rdataset_current(rdataset, &rdata);
++		result = syncptr(inst, name, &rdata, rdataset->ttl, op);
++		if (result != ISC_R_SUCCESS && result != ISC_R_NOTFOUND)
++			goto cleanup;
++	}
++	if (result == ISC_R_NOMORE)
++		result = ISC_R_SUCCESS;
++
++cleanup:
++	return (result);
++}
+diff --git a/bin/tests/system/dyndb/driver/syncptr.h b/bin/tests/system/dyndb/driver/syncptr.h
+new file mode 100644
+index 0000000..2f9b3a6
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/syncptr.h
+@@ -0,0 +1,15 @@
++/*
++ * Sync PTR records
++ *
++ * Copyright (C) 2014-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef SYNCPTR_H_
++#define SYNCPTR_H_
++
++#include <dns/diff.h>
++isc_result_t
++syncptrs(sample_instance_t *inst, dns_name_t *name, dns_rdataset_t *rdataset,
++	 dns_diffop_t op);
++
++#endif /* SYNCPTR_H_ */
+diff --git a/bin/tests/system/dyndb/driver/util.h b/bin/tests/system/dyndb/driver/util.h
+new file mode 100644
+index 0000000..2a00fe3
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/util.h
+@@ -0,0 +1,57 @@
++/*
++ * Memory allocation and error handling utilities.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef _LD_UTIL_H_
++#define _LD_UTIL_H_
++
++#include <isc/mem.h>
++#include <dns/types.h>
++
++#include "log.h"
++
++#define CLEANUP_WITH(result_code)				\
++	do {							\
++		result = (result_code);				\
++		goto cleanup;					\
++	} while(0)
++
++#define CHECK(op)						\
++	do {							\
++		result = (op);					\
++		if (result != ISC_R_SUCCESS)			\
++			goto cleanup;				\
++	} while (0)
++
++#define CHECKED_MEM_GET(m, target_ptr, s)			\
++	do {							\
++		(target_ptr) = isc_mem_get((m), (s));		\
++		if ((target_ptr) == NULL) {			\
++			result = ISC_R_NOMEMORY;		\
++			log_error("Memory allocation failed");	\
++			goto cleanup;				\
++		}						\
++	} while (0)
++
++#define CHECKED_MEM_GET_PTR(m, target_ptr)			\
++	CHECKED_MEM_GET(m, target_ptr, sizeof(*(target_ptr)))
++
++#define CHECKED_MEM_STRDUP(m, source, target)			\
++	do {							\
++		(target) = isc_mem_strdup((m), (source));	\
++		if ((target) == NULL) {				\
++			result = ISC_R_NOMEMORY;		\
++			log_error("Memory allocation failed");	\
++			goto cleanup;				\
++		}						\
++	} while (0)
++
++#define ZERO_PTR(ptr) memset((ptr), 0, sizeof(*(ptr)))
++
++#define MEM_PUT_AND_DETACH(target_ptr)				\
++	isc_mem_putanddetach(&(target_ptr)->mctx, target_ptr,	\
++			     sizeof(*(target_ptr)))
++
++#endif /* !_LD_UTIL_H_ */
+diff --git a/bin/tests/system/dyndb/driver/zone.c b/bin/tests/system/dyndb/driver/zone.c
+new file mode 100644
+index 0000000..88bd967
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/zone.c
+@@ -0,0 +1,192 @@
++/*
++ * Zone management.
++ *
++ * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#include <config.h>
++
++#include <isc/util.h>
++
++#include <dns/dyndb.h>
++#include <dns/view.h>
++#include <dns/zone.h>
++
++#include "util.h"
++#include "instance.h"
++#include "lock.h"
++#include "log.h"
++#include "zone.h"
++
++extern const char *impname;
++
++/*
++ * Create a new zone with origin 'name'. The zone stay invisible to clients
++ * until it is explicitly added to a view.
++ */
++isc_result_t
++create_zone(sample_instance_t * const inst, dns_name_t * const name,
++	    dns_zone_t ** const rawp)
++{
++	isc_result_t result;
++	dns_zone_t *raw = NULL;
++	const char *zone_argv[1];
++	char zone_name[DNS_NAME_FORMATSIZE];
++	dns_acl_t *acl_any = NULL;
++
++	REQUIRE(inst != NULL);
++	REQUIRE(name != NULL);
++	REQUIRE(rawp != NULL && *rawp == NULL);
++
++	zone_argv[0] = inst->db_name;
++
++	log_info("debug isc_mem_debugging(%p)=%X", &isc_mem_debugging, isc_mem_debugging);
++	CHECK(dns_zone_create(&raw, inst->mctx));
++	CHECK(dns_zone_setorigin(raw, name));
++	dns_zone_setclass(raw, dns_rdataclass_in);
++	dns_zone_settype(raw, dns_zone_master);
++	CHECK(dns_zone_setdbtype(raw, 1, zone_argv));
++	CHECK(dns_zonemgr_managezone(inst->zmgr, raw));
++
++	/* This is completely insecure - use some sensible values instead! */
++	CHECK(dns_acl_any(inst->mctx, &acl_any));
++	dns_zone_setupdateacl(raw, acl_any);
++	dns_zone_setqueryacl(raw, acl_any);
++	dns_zone_setxfracl(raw, acl_any);
++	dns_acl_detach(&acl_any);
++
++	*rawp = raw;
++	return (ISC_R_SUCCESS);
++
++cleanup:
++	dns_name_format(name, zone_name, DNS_NAME_FORMATSIZE);
++	log_error_r("failed to create new zone '%s'", zone_name);
++
++	if (raw != NULL) {
++		if (dns_zone_getmgr(raw) != NULL)
++			dns_zonemgr_releasezone(inst->zmgr, raw);
++		dns_zone_detach(&raw);
++	}
++	if (acl_any != NULL)
++		dns_acl_detach(&acl_any);
++
++	return (result);
++}
++
++/*
++ * Add zone to the view defined in inst->view. This will make the zone visible
++ * to clients.
++ */
++static isc_result_t
++publish_zone(sample_instance_t *inst, dns_zone_t *zone) {
++	isc_result_t result;
++	isc_boolean_t freeze = ISC_FALSE;
++	dns_zone_t *zone_in_view = NULL;
++	dns_view_t *view_in_zone = NULL;
++	isc_result_t lock_state = ISC_R_IGNORE;
++
++	REQUIRE(inst != NULL);
++	REQUIRE(zone != NULL);
++
++	/* Return success if the zone is already in the view as expected. */
++	result = dns_view_findzone(inst->view, dns_zone_getorigin(zone),
++				   &zone_in_view);
++	if (result != ISC_R_SUCCESS && result != ISC_R_NOTFOUND)
++		goto cleanup;
++
++	view_in_zone = dns_zone_getview(zone);
++	if (view_in_zone != NULL) {
++		/* Zone has a view set -> view should contain the same zone. */
++		if (zone_in_view == zone) {
++			/* Zone is already published in the right view. */
++			CLEANUP_WITH(ISC_R_SUCCESS);
++		} else if (view_in_zone != inst->view) {
++			/*
++			 * Un-published inactive zone will have
++			 * inst->view in zone but will not be present
++			 * in the view itself.
++			 */
++			dns_zone_log(zone, ISC_LOG_ERROR,
++				     "zone->view doesn't "
++				     "match data in the view");
++			CLEANUP_WITH(ISC_R_UNEXPECTED);
++		}
++	}
++
++	if (zone_in_view != NULL) {
++		dns_zone_log(zone, ISC_LOG_ERROR,
++			     "cannot publish zone: view already "
++			     "contains another zone with this name");
++		CLEANUP_WITH(ISC_R_UNEXPECTED);
++	}
++
++	run_exclusive_enter(inst, &lock_state);
++	if (inst->view->frozen) {
++		freeze = ISC_TRUE;
++		dns_view_thaw(inst->view);
++	}
++
++	dns_zone_setview(zone, inst->view);
++	CHECK(dns_view_addzone(inst->view, zone));
++
++cleanup:
++	if (zone_in_view != NULL)
++		dns_zone_detach(&zone_in_view);
++	if (freeze)
++		dns_view_freeze(inst->view);
++	run_exclusive_exit(inst, lock_state);
++
++	return (result);
++}
++
++/*
++ * @warning Never call this on raw part of in-line secure zone, call it only
++ * on the secure zone!
++ */
++static isc_result_t
++load_zone(dns_zone_t *zone) {
++	isc_result_t result;
++	isc_boolean_t zone_dynamic;
++	isc_uint32_t serial;
++
++	result = dns_zone_load(zone);
++	if (result != ISC_R_SUCCESS && result != DNS_R_UPTODATE
++	    && result != DNS_R_DYNAMIC && result != DNS_R_CONTINUE)
++		goto cleanup;
++	zone_dynamic = (result == DNS_R_DYNAMIC);
++
++	CHECK(dns_zone_getserial2(zone, &serial));
++	dns_zone_log(zone, ISC_LOG_INFO, "loaded serial %u", serial);
++
++	if (zone_dynamic)
++		dns_zone_notify(zone);
++
++cleanup:
++	return (result);
++}
++
++/*
++ * Add zone to view and call dns_zone_load().
++ */
++isc_result_t
++activate_zone(sample_instance_t *inst, dns_zone_t *raw) {
++	isc_result_t result;
++
++	/*
++	 * Zone has to be published *before* zone load
++	 * otherwise it will race with zone->view != NULL check
++	 * in zone_maintenance() in zone.c.
++	 */
++	result = publish_zone(inst, raw);
++	if (result != ISC_R_SUCCESS) {
++		dns_zone_log(raw, ISC_LOG_ERROR,
++			     "cannot add zone to view: %s",
++			     dns_result_totext(result));
++		goto cleanup;
++	}
++
++	CHECK(load_zone(raw));
++
++cleanup:
++	return (result);
++}
+diff --git a/bin/tests/system/dyndb/driver/zone.h b/bin/tests/system/dyndb/driver/zone.h
+new file mode 100644
+index 0000000..a862691
+--- /dev/null
++++ b/bin/tests/system/dyndb/driver/zone.h
+@@ -0,0 +1,15 @@
++/*
++ * Copyright (C) 2014-2015  Red Hat ; see COPYRIGHT for license
++ */
++
++#ifndef ZONE_H_
++#define ZONE_H_
++
++isc_result_t
++create_zone(sample_instance_t * const inst, dns_name_t * const name,
++	    dns_zone_t ** const rawp);
++
++isc_result_t
++activate_zone(sample_instance_t *inst, dns_zone_t *raw);
++
++#endif /* ZONE_H_ */
+diff --git a/bin/tests/system/dyndb/ns1/named.conf b/bin/tests/system/dyndb/ns1/named.conf
+new file mode 100644
+index 0000000..a4f334b
+--- /dev/null
++++ b/bin/tests/system/dyndb/ns1/named.conf
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++controls { };
++
++options {
++	query-source address 10.53.0.1;
++	notify-source 10.53.0.1;
++	transfer-source 10.53.0.1;
++	port 5300;
++	pid-file "named.pid";
++	session-keyfile "session.key";
++	listen-on { 10.53.0.1; 127.0.0.1; };
++	listen-on-v6 { none; };
++	recursion no;
++	notify yes;
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-sha256;
++};
++
++controls {
++	inet 10.53.0.1 port 9953 allow { any; } keys { rndc_key; };
++};
++
++dyndb sample "../driver/lib/sample.so" { ipv4.example.nil. in-addr.arpa. };
++dyndb sample2 "../driver/lib/sample.so" { ipv6.example.nil. 8.b.d.0.1.0.0.2.ip6.arpa. };
+diff --git a/bin/tests/system/dyndb/prereq.sh b/bin/tests/system/dyndb/prereq.sh
+new file mode 100644
+index 0000000..fe7ef71
+--- /dev/null
++++ b/bin/tests/system/dyndb/prereq.sh
+@@ -0,0 +1,21 @@
++#!/bin/sh
++#
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++../dlzexternal/dlopen ||  {
++        echo "I:dlopen() not supported - skipping dyndb test"
++        exit 255
++}
++exit 0
+diff --git a/bin/tests/system/dyndb/tests.sh b/bin/tests/system/dyndb/tests.sh
+new file mode 100644
+index 0000000..590b70b
+--- /dev/null
++++ b/bin/tests/system/dyndb/tests.sh
+@@ -0,0 +1,155 @@
++#!/bin/sh
++#
++# Copyright (C) 2010-2014  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++SYSTEMTESTTOP=..
++. $SYSTEMTESTTOP/conf.sh
++
++status=0
++n=0
++
++DIGOPTS="@10.53.0.1 -p 5300"
++
++newtest() {
++	n=`expr $n + 1`
++	echo "${1} (${n})"
++	ret=0
++}
++
++test_add() {
++    host="$1"
++    type="$2"
++    ip="$3"
++
++    cat <<EOF > ns1/update.txt
++server 10.53.0.1 5300
++ttl 86400
++update add $host $type $ip
++send
++EOF
++
++    newtest "I:adding $host $type $ip"
++    $NSUPDATE ns1/update.txt > /dev/null 2>&1 || {
++	[ "$should_fail" ] || \
++             echo "I:update failed for $host $type $ip"
++	return 1
++    }
++
++    out=`$DIG $DIGOPTS +noall +answer -t $type -q $host`
++    echo $out > added.a.out.$n
++    lines=`echo "$out" | grep "$ip" | wc -l`
++    [ $lines -eq 1 ] || {
++	[ "$should_fail" ] || \
++            echo "I:dig output incorrect for $host $type $cmd: $out"
++	return 1
++    }
++
++    out=`$DIG $DIGOPTS +noall +answer -x $ip`
++    echo $out > added.ptr.out.$n
++    lines=`echo "$out" | grep "$host" | wc -l`
++    [ $lines -eq 1 ] || {
++	[ "$should_fail" ] || \
++            echo "I:dig reverse output incorrect for $host $type $cmd: $out"
++	return 1
++    }
++
++    return 0
++}
++
++test_del() {
++    host="$1"
++    type="$2"
++
++    ip=`$DIG $DIGOPTS +short $host $type`
++
++    cat <<EOF > ns1/update.txt
++server 10.53.0.1 5300
++update del $host $type
++send
++EOF
++
++    newtest "I:deleting $host $type (was $ip)"
++    $NSUPDATE ns1/update.txt > /dev/null 2>&1 || {
++	[ "$should_fail" ] || \
++             echo "I:update failed deleting $host $type"
++	return 1
++    }
++
++    out=`$DIG $DIGOPTS +noall +answer -t $type -q $host`
++    echo $out > deleted.a.out.$n
++    lines=`echo "$out" | grep "$ip" | wc -l`
++    [ $lines -eq 0 ] || {
++	[ "$should_fail" ] || \
++            echo "I:dig output incorrect for $host $type $cmd: $out"
++	return 1
++    }
++
++    out=`$DIG $DIGOPTS +noall +answer -x $ip`
++    echo $out > deleted.ptr.out.$n
++    lines=`echo "$out" | grep "$host" | wc -l`
++    [ $lines -eq 0 ] || {
++	[ "$should_fail" ] || \
++            echo "I:dig reverse output incorrect for $host $type $cmd: $out"
++	return 1
++    }
++
++    return 0
++}
++
++test_add test1.ipv4.example.nil. A "10.53.0.10" || ret=1
++status=`expr $status + $ret`
++
++test_add test2.ipv4.example.nil. A "10.53.0.11" || ret=1
++status=`expr $status + $ret`
++
++test_add test3.ipv4.example.nil. A "10.53.0.12" || ret=1
++status=`expr $status + $ret`
++
++test_add test4.ipv6.example.nil. AAAA "2001:db8::1" || ret=1
++status=`expr $status + $ret`
++
++test_del test1.ipv4.example.nil. A || ret=1
++status=`expr $status + $ret`
++
++test_del test2.ipv4.example.nil. A || ret=1
++status=`expr $status + $ret`
++
++test_del test3.ipv4.example.nil. A || ret=1
++status=`expr $status + $ret`
++
++test_del test4.ipv6.example.nil. AAAA || ret=1
++status=`expr $status + $ret`
++
++newtest "I:checking parameter logging"
++grep "loading params for dyndb 'sample' from .*named.conf:41" ns1/named.run > /dev/null || ret=1
++grep "loading params for dyndb 'sample2' from .*named.conf:42" ns1/named.run > /dev/null || ret=1
++status=`expr $status + $ret`
++
++echo "I:checking dyndb still works after reload"
++$RNDC -c ../common/rndc.conf -s 10.53.0.1 -p 9953 reload 2>&1 | sed 's/^/I:ns1 /'
++
++test_add test5.ipv4.example.nil. A "10.53.0.10" || ret=1
++status=`expr $status + $ret`
++
++test_add test6.ipv6.example.nil. AAAA "2001:db8::1" || ret=1
++status=`expr $status + $ret`
++
++test_del test5.ipv4.example.nil. A || ret=1
++status=`expr $status + $ret`
++
++test_del test6.ipv6.example.nil. AAAA || ret=1
++status=`expr $status + $ret`
++
++exit $status
+diff --git a/configure b/configure
+index 2a53adf..c62da63 100755
+--- a/configure
++++ b/configure
+@@ -162,7 +162,7 @@
+ #
+ #  -----------------------------------------------------------------------------
+ #
+-# Copyright (c) 1997 - 2003 Kungliga Tekniska Högskolan
++# Copyright (c) 1997 - 2003 Kungliga Tekniska Hï¿½gskolan
+ # (Royal Institute of Technology, Stockholm, Sweden).
+ # All rights reserved.
+ #
+@@ -19784,6 +19784,7 @@ $as_echo "#define ISC_DLZ_DLOPEN 1" >>confdefs.h
+ 
+ 	fi
+ fi
++CFLAGS="$CFLAGS $SO_CFLAGS"
+ 
+ 
+ 
+@@ -20594,7 +20595,7 @@ ac_config_commands="$ac_config_commands chmod"
+ # elsewhere if there's a good reason for doing so.
+ #
+ 
+-ac_config_files="$ac_config_files make/Makefile make/mkdep Makefile bin/Makefile bin/check/Makefile bin/confgen/Makefile bin/confgen/unix/Makefile bin/dig/Makefile bin/dnssec/Makefile bin/named/Makefile bin/named/unix/Makefile bin/nsupdate/Makefile bin/pkcs11/Makefile bin/python/Makefile bin/python/dnssec-checkds.py bin/python/dnssec-coverage.py bin/rndc/Makefile bin/tests/Makefile bin/tests/atomic/Makefile bin/tests/db/Makefile bin/tests/dst/Makefile bin/tests/dst/Kdh.+002+18602.key bin/tests/dst/Kdh.+002+18602.private bin/tests/dst/Kdh.+002+48957.key bin/tests/dst/Kdh.+002+48957.private bin/tests/dst/Ktest.+001+00002.key bin/tests/dst/Ktest.+001+54622.key bin/tests/dst/Ktest.+001+54622.private bin/tests/dst/Ktest.+003+23616.key bin/tests/dst/Ktest.+003+23616.private bin/tests/dst/Ktest.+003+49667.key bin/tests/dst/dst_2_data bin/tests/dst/t2_data_1 bin/tests/dst/t2_data_2 bin/tests/dst/t2_dsasig bin/tests/dst/t2_rsasig bin/tests/hashes/Makefile bin/tests/headerdep_test.sh bin/tests/master/Makefile bin/tests/mem/Makefile bin/tests/names/Makefile bin/tests/net/Makefile bin/tests/rbt/Makefile bin/tests/resolver/Makefile bin/tests/sockaddr/Makefile bin/tests/system/Makefile bin/tests/system/conf.sh bin/tests/system/dlz/prereq.sh bin/tests/system/dlzexternal/Makefile bin/tests/system/dlzexternal/ns1/named.conf bin/tests/system/ecdsa/prereq.sh bin/tests/system/filter-aaaa/Makefile bin/tests/system/gost/prereq.sh bin/tests/system/lwresd/Makefile bin/tests/system/rpz/Makefile bin/tests/system/rrl/Makefile bin/tests/system/rsabigexponent/Makefile bin/tests/system/tkey/Makefile bin/tests/system/tsiggss/Makefile bin/tests/tasks/Makefile bin/tests/timers/Makefile bin/tests/virtual-time/Makefile bin/tests/virtual-time/conf.sh bin/tools/Makefile contrib/check-secure-delegation.pl contrib/zone-edit.sh doc/Makefile doc/arm/Makefile doc/doxygen/Doxyfile doc/doxygen/Makefile doc/doxygen/doxygen-input-filter doc/misc/Makefile doc/xsl/Makefile doc/xsl/isc-docbook-chunk.xsl doc/xsl/isc-docbook-html.xsl doc/xsl/isc-docbook-latex.xsl doc/xsl/isc-manpage.xsl isc-config.sh lib/Makefile lib/bind9/Makefile lib/bind9/include/Makefile lib/bind9/include/bind9/Makefile lib/dns/Makefile lib/dns/include/Makefile lib/dns/include/dns/Makefile lib/dns/include/dst/Makefile lib/dns/tests/Makefile lib/export/Makefile lib/export/dns/Makefile lib/export/dns/include/Makefile lib/export/dns/include/dns/Makefile lib/export/dns/include/dst/Makefile lib/export/irs/Makefile lib/export/irs/include/Makefile lib/export/irs/include/irs/Makefile lib/export/isc/$thread_dir/Makefile lib/export/isc/$thread_dir/include/Makefile lib/export/isc/$thread_dir/include/isc/Makefile lib/export/isc/Makefile lib/export/isc/include/Makefile lib/export/isc/include/isc/Makefile lib/export/isc/nls/Makefile lib/export/isc/unix/Makefile lib/export/isc/unix/include/Makefile lib/export/isc/unix/include/isc/Makefile lib/export/isccfg/Makefile lib/export/isccfg/include/Makefile lib/export/isccfg/include/isccfg/Makefile lib/export/samples/Makefile lib/export/samples/Makefile-postinstall lib/irs/Makefile lib/irs/include/Makefile lib/irs/include/irs/Makefile lib/irs/include/irs/netdb.h lib/irs/include/irs/platform.h lib/isc/$arch/Makefile lib/isc/$arch/include/Makefile lib/isc/$arch/include/isc/Makefile lib/isc/$thread_dir/Makefile lib/isc/$thread_dir/include/Makefile lib/isc/$thread_dir/include/isc/Makefile lib/isc/Makefile lib/isc/include/Makefile lib/isc/include/isc/Makefile lib/isc/include/isc/platform.h lib/isc/tests/Makefile lib/isc/nls/Makefile lib/isc/unix/Makefile lib/isc/unix/include/Makefile lib/isc/unix/include/isc/Makefile lib/isccc/Makefile lib/isccc/include/Makefile lib/isccc/include/isccc/Makefile lib/isccfg/Makefile lib/isccfg/include/Makefile lib/isccfg/include/isccfg/Makefile lib/lwres/Makefile lib/lwres/include/Makefile lib/lwres/include/lwres/Makefile lib/lwres/include/lwres/netdb.h lib/lwres/include/lwres/platform.h lib/lwres/man/Makefile lib/lwres/unix/Makefile lib/lwres/unix/include/Makefile lib/lwres/unix/include/lwres/Makefile lib/tests/Makefile lib/tests/include/Makefile lib/tests/include/tests/Makefile unit/Makefile unit/unittest.sh"
++ac_config_files="$ac_config_files make/Makefile make/mkdep Makefile bin/Makefile bin/check/Makefile bin/confgen/Makefile bin/confgen/unix/Makefile bin/dig/Makefile bin/dnssec/Makefile bin/named/Makefile bin/named/unix/Makefile bin/nsupdate/Makefile bin/pkcs11/Makefile bin/python/Makefile bin/python/dnssec-checkds.py bin/python/dnssec-coverage.py bin/rndc/Makefile bin/tests/Makefile bin/tests/atomic/Makefile bin/tests/db/Makefile bin/tests/dst/Makefile bin/tests/dst/Kdh.+002+18602.key bin/tests/dst/Kdh.+002+18602.private bin/tests/dst/Kdh.+002+48957.key bin/tests/dst/Kdh.+002+48957.private bin/tests/dst/Ktest.+001+00002.key bin/tests/dst/Ktest.+001+54622.key bin/tests/dst/Ktest.+001+54622.private bin/tests/dst/Ktest.+003+23616.key bin/tests/dst/Ktest.+003+23616.private bin/tests/dst/Ktest.+003+49667.key bin/tests/dst/dst_2_data bin/tests/dst/t2_data_1 bin/tests/dst/t2_data_2 bin/tests/dst/t2_dsasig bin/tests/dst/t2_rsasig bin/tests/hashes/Makefile bin/tests/headerdep_test.sh bin/tests/master/Makefile bin/tests/mem/Makefile bin/tests/names/Makefile bin/tests/net/Makefile bin/tests/rbt/Makefile bin/tests/resolver/Makefile bin/tests/sockaddr/Makefile bin/tests/system/Makefile bin/tests/system/conf.sh bin/tests/system/dlz/prereq.sh bin/tests/system/dlzexternal/Makefile bin/tests/system/dlzexternal/ns1/named.conf bin/tests/system/dyndb/Makefile bin/tests/system/dyndb/driver/Makefile bin/tests/system/ecdsa/prereq.sh bin/tests/system/filter-aaaa/Makefile bin/tests/system/gost/prereq.sh bin/tests/system/lwresd/Makefile bin/tests/system/rpz/Makefile bin/tests/system/rrl/Makefile bin/tests/system/rsabigexponent/Makefile bin/tests/system/tkey/Makefile bin/tests/system/tsiggss/Makefile bin/tests/tasks/Makefile bin/tests/timers/Makefile bin/tests/virtual-time/Makefile bin/tests/virtual-time/conf.sh bin/tools/Makefile contrib/check-secure-delegation.pl contrib/zone-edit.sh doc/Makefile doc/arm/Makefile doc/doxygen/Doxyfile doc/doxygen/Makefile doc/doxygen/doxygen-input-filter doc/misc/Makefile doc/xsl/Makefile doc/xsl/isc-docbook-chunk.xsl doc/xsl/isc-docbook-html.xsl doc/xsl/isc-docbook-latex.xsl doc/xsl/isc-manpage.xsl isc-config.sh lib/Makefile lib/bind9/Makefile lib/bind9/include/Makefile lib/bind9/include/bind9/Makefile lib/dns/Makefile lib/dns/include/Makefile lib/dns/include/dns/Makefile lib/dns/include/dst/Makefile lib/dns/tests/Makefile lib/export/Makefile lib/export/dns/Makefile lib/export/dns/include/Makefile lib/export/dns/include/dns/Makefile lib/export/dns/include/dst/Makefile lib/export/irs/Makefile lib/export/irs/include/Makefile lib/export/irs/include/irs/Makefile lib/export/isc/$thread_dir/Makefile lib/export/isc/$thread_dir/include/Makefile lib/export/isc/$thread_dir/include/isc/Makefile lib/export/isc/Makefile lib/export/isc/include/Makefile lib/export/isc/include/isc/Makefile lib/export/isc/nls/Makefile lib/export/isc/unix/Makefile lib/export/isc/unix/include/Makefile lib/export/isc/unix/include/isc/Makefile lib/export/isccfg/Makefile lib/export/isccfg/include/Makefile lib/export/isccfg/include/isccfg/Makefile lib/export/samples/Makefile lib/export/samples/Makefile-postinstall lib/irs/Makefile lib/irs/include/Makefile lib/irs/include/irs/Makefile lib/irs/include/irs/netdb.h lib/irs/include/irs/platform.h lib/isc/$arch/Makefile lib/isc/$arch/include/Makefile lib/isc/$arch/include/isc/Makefile lib/isc/$thread_dir/Makefile lib/isc/$thread_dir/include/Makefile lib/isc/$thread_dir/include/isc/Makefile lib/isc/Makefile lib/isc/include/Makefile lib/isc/include/isc/Makefile lib/isc/include/isc/platform.h lib/isc/tests/Makefile lib/isc/nls/Makefile lib/isc/unix/Makefile lib/isc/unix/include/Makefile lib/isc/unix/include/isc/Makefile lib/isccc/Makefile lib/isccc/include/Makefile lib/isccc/include/isccc/Makefile lib/isccfg/Makefile lib/isccfg/include/Makefile lib/isccfg/include/isccfg/Makefile lib/lwres/Makefile lib/lwres/include/Makefile lib/lwres/include/lwres/Makefile lib/lwres/include/lwres/netdb.h lib/lwres/include/lwres/platform.h lib/lwres/man/Makefile lib/lwres/unix/Makefile lib/lwres/unix/include/Makefile lib/lwres/unix/include/lwres/Makefile lib/tests/Makefile lib/tests/include/Makefile lib/tests/include/tests/Makefile unit/Makefile unit/unittest.sh"
+ 
+ 
+ #
+@@ -21637,6 +21638,8 @@ do
+     "bin/tests/system/dlz/prereq.sh") CONFIG_FILES="$CONFIG_FILES bin/tests/system/dlz/prereq.sh" ;;
+     "bin/tests/system/dlzexternal/Makefile") CONFIG_FILES="$CONFIG_FILES bin/tests/system/dlzexternal/Makefile" ;;
+     "bin/tests/system/dlzexternal/ns1/named.conf") CONFIG_FILES="$CONFIG_FILES bin/tests/system/dlzexternal/ns1/named.conf" ;;
++    "bin/tests/system/dyndb/Makefile") CONFIG_FILES="$CONFIG_FILES bin/tests/system/dyndb/Makefile" ;;
++    "bin/tests/system/dyndb/driver/Makefile") CONFIG_FILES="$CONFIG_FILES bin/tests/system/dyndb/driver/Makefile" ;;
+     "bin/tests/system/ecdsa/prereq.sh") CONFIG_FILES="$CONFIG_FILES bin/tests/system/ecdsa/prereq.sh" ;;
+     "bin/tests/system/filter-aaaa/Makefile") CONFIG_FILES="$CONFIG_FILES bin/tests/system/filter-aaaa/Makefile" ;;
+     "bin/tests/system/gost/prereq.sh") CONFIG_FILES="$CONFIG_FILES bin/tests/system/gost/prereq.sh" ;;
+diff --git a/configure.in b/configure.in
+index 24eafb7..e8c68fc 100644
+--- a/configure.in
++++ b/configure.in
+@@ -3755,6 +3755,7 @@ if test "$dlopen" = "yes"; then
+ 			  [Define to allow building of objects for dlopen().])
+ 	fi
+ fi
++CFLAGS="$CFLAGS $SO_CFLAGS"
+ 
+ AC_SUBST(SO)
+ AC_SUBST(SO_CFLAGS)
+@@ -3960,6 +3961,8 @@ AC_CONFIG_FILES([
+ 	bin/tests/system/dlz/prereq.sh
+ 	bin/tests/system/dlzexternal/Makefile
+ 	bin/tests/system/dlzexternal/ns1/named.conf
++	bin/tests/system/dyndb/Makefile
++	bin/tests/system/dyndb/driver/Makefile
+ 	bin/tests/system/ecdsa/prereq.sh
+ 	bin/tests/system/filter-aaaa/Makefile
+ 	bin/tests/system/gost/prereq.sh
+diff --git a/doc/arm/Bv9ARM-book.xml b/doc/arm/Bv9ARM-book.xml
+index bd42e11..16b50a3 100644
+--- a/doc/arm/Bv9ARM-book.xml
++++ b/doc/arm/Bv9ARM-book.xml
+@@ -2384,6 +2384,8 @@ options {
+ 
+     <xi:include href="pkcs11.xml"/>
+ 
++    <xi:include href="dyndb.xml"/>
++
+     <sect1>
+       <title>IPv6 Support in <acronym>BIND</acronym> 9</title>
+ 
+diff --git a/doc/arm/dyndb.xml b/doc/arm/dyndb.xml
+new file mode 100644
+index 0000000..4d92b22
+--- /dev/null
++++ b/doc/arm/dyndb.xml
+@@ -0,0 +1,105 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++ - Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ -
++ - Permission to use, copy, modify, and/or distribute this software for any
++ - purpose with or without fee is hereby granted, provided that the above
++ - copyright notice and this permission notice appear in all copies.
++ -
++ - THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ - REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ - AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ - INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ - LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ - OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ - PERFORMANCE OF THIS SOFTWARE.
++-->
++
++<sect1 id="dyndb-info">
++  <title>DynDB (Dynamic Database)</title>
++  <para>
++    DynDB is an extension to BIND 9 which, like DLZ
++    (see <xref linkend="dlz-info"/>), allows zone data to be
++    retrieved from an external database.  Unlike DLZ, a DynDB module
++    provides a full-featured BIND zone database interface.  Where
++    DLZ translates DNS queries into real-time database lookups,
++    resulting in relatively poor query performance, and is unable
++    to handle DNSSEC-signed data due to its limited API, a DynDB
++    module can pre-load an in-memory database from the external
++    data source, providing the same performance and functionality
++    as zones served natively by BIND.
++  </para>
++  <para>
++    A DynDB module supporting LDAP has been created by Red Hat
++    and is available from
++    <ulink url="https://fedorahosted.org/bind-dyndb-ldap/"
++      >https://fedorahosted.org/bind-dyndb-ldap/</ulink>.
++  </para>
++  <para>
++    A sample DynDB module for testing and developer guidance
++    is included with the BIND source code, in the directory
++    <filename>bin/tests/system/dyndb/driver</filename>.
++  </para>
++
++  <sect2>
++    <title>Configuring DynDB</title>
++    <para>
++      A DynDB database is configured with a <command>dyndb</command>
++      statement in <filename>named.conf</filename>:
++    </para>
++    <screen>
++    dyndb example "driver.so" {
++        <replaceable>parameters</replaceable>
++    };
++    </screen>
++    <para>
++      The file <filename>driver.so</filename> is a DynDB module which
++      implements the full DNS database API.  Multiple
++      <command>dyndb</command> statements can be specified, to load
++      different drivers or multiple instances of the same driver.
++      Zones provided by a DynDB module are added to the view's zone
++      table, and are treated as normal authoritative zones when BIND
++      is responding to queries.  Zone configuration is handled internally
++      by the DynDB module.
++    </para>
++    <para>
++      The <replaceable>parameters</replaceable> are passed as an opaque
++      string to the DynDB module's initialization routine. Configuration
++      syntax will differ depending on the driver.
++    </para>
++  </sect2>
++  <sect2>
++    <title>Sample DynDB Module</title>
++    <para>
++      For guidance in implementation of DynDB modules, the directory
++      <filename>bin/tests/system/dyndb/driver</filename>.
++      contains a basic DynDB module.
++      The example sets up two zones, whose names are passed
++      to the module as arguments in the <command>dyndb</command>
++      statement:
++    </para>
++    <screen>
++    dyndb sample "sample.so" { example.nil. arpa. };
++    </screen>
++    <para>
++      In the above example, the module is configured to create a zone
++      "example.nil", which can answer queries and AXFR requests, and
++      accept DDNS updates.  At runtime, prior to any updates, the zone
++      contains an SOA, NS, and a single A record at the apex:
++    </para>
++    <screen>
++ example.nil.  86400    IN      SOA     example.nil. example.nil. (
++                                               0 28800 7200 604800 86400
++                                       )
++ example.nil.  86400    IN      NS      example.nil.
++ example.nil.  86400    IN      A       127.0.0.1
++    </screen>
++    <para>
++      When the zone is updated dynamically, the DynDB module will determine
++      whether the updated RR is an address (i.e., type A or AAAA) and if
++      so, it will automatically update the corresponding PTR record in a
++      reverse zone.  (Updates are not stored permanently; all updates are
++      lost when the server is restarted.)
++    </para>
++  </sect2>
++</sect1>
+diff --git a/lib/dns/Makefile.in b/lib/dns/Makefile.in
+index 909250f..2efcc5a 100644
+--- a/lib/dns/Makefile.in
++++ b/lib/dns/Makefile.in
+@@ -60,8 +60,8 @@ RRLOBJS =	rrl.@O@
+ DNSOBJS =	acache.@O@ acl.@O@ adb.@O@ byaddr.@O@ \
+ 		cache.@O@ callbacks.@O@ clientinfo.@O@ compress.@O@ \
+ 		db.@O@ dbiterator.@O@ dbtable.@O@ diff.@O@ dispatch.@O@ \
+-		dlz.@O@ dns64.@O@ dnssec.@O@ ds.@O@ forward.@O@ iptable.@O@ \
+-		journal.@O@ keydata.@O@ keytable.@O@ \
++		dlz.@O@ dns64.@O@ dnssec.@O@ ds.@O@ dyndb.@O@ forward.@O@ \
++		iptable.@O@ journal.@O@ keydata.@O@ keytable.@O@ \
+ 		lib.@O@ log.@O@ lookup.@O@ \
+ 		master.@O@ masterdump.@O@ message.@O@ \
+ 		name.@O@ ncache.@O@ nsec.@O@ nsec3.@O@ order.@O@ peer.@O@ \
+@@ -93,8 +93,8 @@ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ @PKCS11LINKSRCS@ \
+ DNSSRCS =	acache.c acl.c adb.c byaddr.c \
+ 		cache.c callbacks.c clientinfo.c compress.c \
+ 		db.c dbiterator.c dbtable.c diff.c dispatch.c \
+-		dlz.c dns64.c dnssec.c ds.c forward.c iptable.c journal.c \
+-		keydata.c keytable.c lib.c log.c lookup.c \
++		dlz.c dns64.c dnssec.c ds.c dyndb.c forward.c iptable.c \
++		journal.c keydata.c keytable.c lib.c log.c lookup.c \
+ 		master.c masterdump.c message.c \
+ 		name.c ncache.c nsec.c nsec3.c order.c peer.c portlist.c \
+ 		rbt.c rbtdb.c rbtdb64.c rcode.c rdata.c rdatalist.c \
+diff --git a/lib/dns/dlz.c b/lib/dns/dlz.c
+index 19c600c..ffcd23f 100644
+--- a/lib/dns/dlz.c
++++ b/lib/dns/dlz.c
+@@ -69,6 +69,7 @@
+ 
+ 
+ #include <isc/buffer.h>
++#include <isc/commandline.h>
+ #include <isc/magic.h>
+ #include <isc/mem.h>
+ #include <isc/once.h>
+@@ -400,67 +401,6 @@ dns_dlzregister(const char *drivername, const dns_dlzmethods_t *methods,
+ }
+ 
+ /*%
+- * Helper function for dns_dlzstrtoargv().
+- * Pardon the gratuitous recursion.
+- */
+-static isc_result_t
+-dns_dlzstrtoargvsub(isc_mem_t *mctx, char *s, unsigned int *argcp,
+-		    char ***argvp, unsigned int n)
+-{
+-	isc_result_t result;
+-
+- restart:
+-	/* Discard leading whitespace. */
+-	while (*s == ' ' || *s == '\t')
+-		s++;
+-
+-	if (*s == '\0') {
+-		/* We have reached the end of the string. */
+-		*argcp = n;
+-		*argvp = isc_mem_get(mctx, n * sizeof(char *));
+-		if (*argvp == NULL)
+-			return (ISC_R_NOMEMORY);
+-	} else {
+-		char *p = s;
+-		while (*p != ' ' && *p != '\t' && *p != '\0' && *p != '{') {
+-			if (*p == '\n') {
+-				*p = ' ';
+-				goto restart;
+-			}
+-			p++;
+-		}
+-
+-		/* do "grouping", items between { and } are one arg */
+-		if (*p == '{') {
+-			char *t = p;
+-			/*
+-			 * shift all characters to left by 1 to get rid of '{'
+-			 */
+-			while (*t != '\0') {
+-				t++;
+-				*(t-1) = *t;
+-			}
+-			while (*p != '\0' && *p != '}') {
+-				p++;
+-			}
+-			/* get rid of '}' character */
+-			if (*p == '}') {
+-				*p = '\0';
+-				p++;
+-			}
+-			/* normal case, no "grouping" */
+-		} else if (*p != '\0')
+-			*p++ = '\0';
+-
+-		result = dns_dlzstrtoargvsub(mctx, p, argcp, argvp, n + 1);
+-		if (result != ISC_R_SUCCESS)
+-			return (result);
+-		(*argvp)[n] = s;
+-	}
+-	return (ISC_R_SUCCESS);
+-}
+-
+-/*%
+  * Tokenize the string "s" into whitespace-separated words,
+  * return the number of words in '*argcp' and an array
+  * of pointers to the words in '*argvp'.  The caller
+@@ -471,7 +411,7 @@ isc_result_t
+ dns_dlzstrtoargv(isc_mem_t *mctx, char *s,
+ 		 unsigned int *argcp, char ***argvp)
+ {
+-	return(dns_dlzstrtoargvsub(mctx, s, argcp, argvp, 0));
++	return(isc_commandline_strtoargv(mctx, s, argcp, argvp, 0));
+ }
+ 
+ /*%
+diff --git a/lib/dns/dyndb.c b/lib/dns/dyndb.c
+new file mode 100644
+index 0000000..76b77f0
+--- /dev/null
++++ b/lib/dns/dyndb.c
+@@ -0,0 +1,486 @@
++/*
++ * Copyright (C) 2008-2011  Red Hat, Inc.
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND Red Hat DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL Red Hat BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++
++#include <config.h>
++
++#if HAVE_DLFCN_H
++#include <dlfcn.h>
++#elif _WIN32
++#include <windows.h>
++#endif
++
++#include <isc/buffer.h>
++#include <isc/mem.h>
++#include <isc/mutex.h>
++#include <isc/once.h>
++#include <isc/result.h>
++#include <isc/region.h>
++#include <isc/task.h>
++#include <isc/types.h>
++#include <isc/util.h>
++
++#include <dns/dyndb.h>
++#include <dns/log.h>
++#include <dns/types.h>
++#include <dns/view.h>
++#include <dns/zone.h>
++
++#include <string.h>
++
++#define CHECK(op)						\
++	do { result = (op);					\
++		if (result != ISC_R_SUCCESS) goto cleanup;	\
++	} while (0)
++
++
++typedef struct dyndb_implementation dyndb_implementation_t;
++struct dyndb_implementation {
++	isc_mem_t			*mctx;
++	void				*handle;
++	dns_dyndb_register_t		*register_func;
++	dns_dyndb_destroy_t		*destroy_func;
++	char				*name;
++	void				*inst;
++	LINK(dyndb_implementation_t)	link;
++};
++
++/*
++ * List of dyndb implementations. Locked by dyndb_lock.
++ *
++ * These are stored here so they can be cleaned up on shutdown.
++ * (The order in which they are stored is not important.)
++ */
++static LIST(dyndb_implementation_t) dyndb_implementations;
++
++/* Locks dyndb_implementations. */
++static isc_mutex_t dyndb_lock;
++static isc_once_t once = ISC_ONCE_INIT;
++
++static void
++dyndb_initialize(void) {
++	RUNTIME_CHECK(isc_mutex_init(&dyndb_lock) == ISC_R_SUCCESS);
++	INIT_LIST(dyndb_implementations);
++}
++
++static dyndb_implementation_t *
++impfind(const char *name) {
++	dyndb_implementation_t *imp;
++
++	for (imp = ISC_LIST_HEAD(dyndb_implementations);
++	     imp != NULL;
++	     imp = ISC_LIST_NEXT(imp, link))
++		if (strcasecmp(name, imp->name) == 0)
++			return (imp);
++	return (NULL);
++}
++
++#if HAVE_DLFCN_H
++static isc_result_t
++load_symbol(void *handle, const char *filename,
++	    const char *symbol_name, void **symbolp)
++{
++	const char *errmsg;
++	void *symbol;
++
++	REQUIRE(handle != NULL);
++	REQUIRE(symbolp != NULL && *symbolp == NULL);
++
++	symbol = dlsym(handle, symbol_name);
++	if (symbol == NULL) {
++		errmsg = dlerror();
++		if (errmsg == NULL)
++			errmsg = "returned function pointer is NULL";
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "failed to lookup symbol %s in "
++			      "dyndb module '%s': %s",
++			      symbol_name, filename, errmsg);
++		return (ISC_R_FAILURE);
++	}
++	dlerror();
++
++	*symbolp = symbol;
++
++	return (ISC_R_SUCCESS);
++}
++
++static isc_result_t
++load_library(isc_mem_t *mctx, const char *filename, const char *instname,
++	     dyndb_implementation_t **impp)
++{
++	isc_result_t result;
++	void *handle = NULL;
++	dyndb_implementation_t *imp = NULL;
++	dns_dyndb_register_t *register_func = NULL;
++	dns_dyndb_destroy_t *destroy_func = NULL;
++	dns_dyndb_version_t *version_func = NULL;
++	int version, flags;
++
++	REQUIRE(impp != NULL && *impp == NULL);
++
++	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++		      DNS_LOGMODULE_DYNDB, ISC_LOG_INFO,
++		      "loading DynDB instance '%s' driver '%s'",
++		      instname, filename);
++
++	flags = RTLD_NOW|RTLD_LOCAL;
++#if 0
++	// Need to access the daemon variables from the plugin, not local copies
++#ifdef RTLD_DEEPBIND
++	flags |= RTLD_DEEPBIND;
++#endif
++#endif
++
++	handle = dlopen(filename, flags);
++	if (handle == NULL)
++		CHECK(ISC_R_FAILURE);
++
++	/* Clear dlerror */
++	dlerror();
++
++	CHECK(load_symbol(handle, filename, "dyndb_version",
++			  (void **)&version_func));
++
++	version = version_func(NULL);
++	if (version < (DNS_DYNDB_VERSION - DNS_DYNDB_AGE) ||
++	    version > DNS_DYNDB_VERSION)
++	{
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "driver API version mismatch: %d/%d",
++			      version, DNS_DYNDB_VERSION);
++		CHECK(ISC_R_FAILURE);
++	}
++
++	CHECK(load_symbol(handle, filename, "dyndb_init",
++			  (void **)&register_func));
++	CHECK(load_symbol(handle, filename, "dyndb_destroy",
++			  (void **)&destroy_func));
++
++	imp = isc_mem_get(mctx, sizeof(dyndb_implementation_t));
++	if (imp == NULL)
++		CHECK(ISC_R_NOMEMORY);
++
++	imp->mctx = NULL;
++	isc_mem_attach(mctx, &imp->mctx);
++	imp->handle = handle;
++	imp->register_func = register_func;
++	imp->destroy_func = destroy_func;
++	imp->name = isc_mem_strdup(mctx, instname);
++	if (imp->name == NULL)
++		CHECK(ISC_R_NOMEMORY);
++
++	imp->inst = NULL;
++	INIT_LINK(imp, link);
++
++	*impp = imp;
++	imp = NULL;
++
++cleanup:
++	if (result != ISC_R_SUCCESS)
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "failed to dynamically load instance '%s' "
++			      "driver '%s': %s (%s)", instname, filename,
++			      dlerror(), isc_result_totext(result));
++	if (imp != NULL)
++		isc_mem_putanddetach(&imp->mctx, imp, sizeof(dyndb_implementation_t));
++	if (result != ISC_R_SUCCESS && handle != NULL)
++		dlclose(handle);
++
++	return (result);
++}
++
++static void
++unload_library(dyndb_implementation_t **impp) {
++	dyndb_implementation_t *imp;
++
++	REQUIRE(impp != NULL && *impp != NULL);
++
++	imp = *impp;
++
++	isc_mem_free(imp->mctx, imp->name);
++	isc_mem_putanddetach(&imp->mctx, imp, sizeof(dyndb_implementation_t));
++
++	*impp = NULL;
++}
++#elif _WIN32
++static isc_result_t
++load_symbol(HMODULE handle, const char *filename,
++	    const char *symbol_name, void **symbolp)
++{
++	void *symbol;
++
++	REQUIRE(handle != NULL);
++	REQUIRE(symbolp != NULL && *symbolp == NULL);
++
++	symbol = GetProcAddress(handle, symbol_name);
++	if (symbol == NULL) {
++		int errstatus = GetLastError();
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "failed to lookup symbol %s in "
++			      "dyndb module '%s': %d",
++			      symbol_name, filename, errstatus);
++		return (ISC_R_FAILURE);
++	}
++
++	*symbolp = symbol;
++
++	return (ISC_R_SUCCESS);
++}
++
++static isc_result_t
++load_library(isc_mem_t *mctx, const char *filename, const char *instname,
++	     dyndb_implementation_t **impp)
++{
++	isc_result_t result;
++	HMODULE handle;
++	dyndb_implementation_t *imp = NULL;
++	dns_dyndb_register_t *register_func = NULL;
++	dns_dyndb_destroy_t *destroy_func = NULL;
++	dns_dyndb_version_t *version_func = NULL;
++	int version;
++
++	REQUIRE(impp != NULL && *impp == NULL);
++
++	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++		      DNS_LOGMODULE_DYNDB, ISC_LOG_INFO,
++		      "loading DynDB instance '%s' driver '%s'",
++		      instname, filename);
++
++	handle = LoadLibraryA(filename);
++	if (handle == NULL)
++		CHECK(ISC_R_FAILURE);
++
++	CHECK(load_symbol(handle, filename, "dyndb_version",
++			  (void **)&version_func));
++
++	version = version_func(NULL);
++	if (version < (DNS_DYNDB_VERSION - DNS_DYNDB_AGE) ||
++	    version > DNS_DYNDB_VERSION)
++	{
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "driver API version mismatch: %d/%d",
++			      version, DNS_DYNDB_VERSION);
++		CHECK(ISC_R_FAILURE);
++	}
++
++	CHECK(load_symbol(handle, filename, "dyndb_init",
++			  (void **)&register_func));
++	CHECK(load_symbol(handle, filename, "dyndb_destroy",
++			  (void **)&destroy_func));
++
++	imp = isc_mem_get(mctx, sizeof(dyndb_implementation_t));
++	if (imp == NULL)
++		CHECK(ISC_R_NOMEMORY);
++
++	imp->mctx = NULL;
++	isc_mem_attach(mctx, &imp->mctx);
++	imp->handle = handle;
++	imp->register_func = register_func;
++	imp->destroy_func = destroy_func;
++	imp->name = isc_mem_strdup(mctx, instname);
++	if (imp->name == NULL)
++		CHECK(ISC_R_NOMEMORY);
++
++	imp->inst = NULL;
++	INIT_LINK(imp, link);
++
++	*impp = imp;
++	imp = NULL;
++
++cleanup:
++	if (result != ISC_R_SUCCESS)
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_ERROR,
++			      "failed to dynamically load instance '%s' "
++			      "driver '%s': %d (%s)", instname, filename,
++			      GetLastError(), isc_result_totext(result));
++	if (imp != NULL)
++		isc_mem_putanddetach(&imp->mctx, imp, sizeof(dyndb_implementation_t));
++	if (result != ISC_R_SUCCESS && handle != NULL)
++		FreeLibrary(handle);
++
++	return (result);
++}
++
++static void
++unload_library(dyndb_implementation_t **impp) {
++	dyndb_implementation_t *imp;
++
++	REQUIRE(impp != NULL && *impp != NULL);
++
++	imp = *impp;
++
++	isc_mem_free(imp->mctx, imp->name);
++	isc_mem_putanddetach(&imp->mctx, imp, sizeof(dyndb_implementation_t));
++
++	*impp = NULL;
++}
++#else	/* HAVE_DLFCN_H || _WIN32 */
++static isc_result_t
++load_library(isc_mem_t *mctx, const char *filename, const char *instname,
++	     dyndb_implementation_t **impp)
++{
++	UNUSED(mctx);
++	UNUSED(filename);
++	UNUSED(instname);
++	UNUSED(impp);
++
++	isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE, DNS_LOGMODULE_DYNDB,
++		      ISC_LOG_ERROR,
++		      "dynamic database support is not implemented")
++
++	return (ISC_R_NOTIMPLEMENTED);
++}
++
++static void
++unload_library(dyndb_implementation_t **impp)
++{
++	dyndb_implementation_t *imp;
++
++	REQUIRE(impp != NULL && *impp != NULL);
++
++	imp = *impp;
++
++	if (imp->handle != NULL)
++		dlclose(imp->handle);
++
++	isc_mem_putanddetach(&imp->mctx, imp, sizeof(dyndb_implementation_t));
++
++	*impp = NULL;
++}
++#endif	/* HAVE_DLFCN_H */
++
++isc_result_t
++dns_dyndb_load(const char *libname, const char *name, const char *parameters,
++	       const char *file, unsigned long line, isc_mem_t *mctx,
++	       const dns_dyndbctx_t *dctx)
++{
++	isc_result_t result;
++	dyndb_implementation_t *implementation = NULL;
++
++	REQUIRE(DNS_DYNDBCTX_VALID(dctx));
++	REQUIRE(name != NULL);
++
++	RUNTIME_CHECK(isc_once_do(&once, dyndb_initialize) == ISC_R_SUCCESS);
++
++	LOCK(&dyndb_lock);
++
++	/* duplicate instance names are not allowed */
++	if (impfind(name) != NULL)
++		CHECK(ISC_R_EXISTS);
++
++	CHECK(load_library(mctx, libname, name, &implementation));
++	CHECK(implementation->register_func(mctx, name, parameters, file, line,
++					    dctx, &implementation->inst));
++
++	APPEND(dyndb_implementations, implementation, link);
++	result = ISC_R_SUCCESS;
++
++cleanup:
++	if (result != ISC_R_SUCCESS)
++		if (implementation != NULL)
++			unload_library(&implementation);
++
++	UNLOCK(&dyndb_lock);
++	return (result);
++}
++
++void
++dns_dyndb_cleanup(isc_boolean_t exiting) {
++	dyndb_implementation_t *elem;
++	dyndb_implementation_t *prev;
++
++	RUNTIME_CHECK(isc_once_do(&once, dyndb_initialize) == ISC_R_SUCCESS);
++
++	LOCK(&dyndb_lock);
++	elem = TAIL(dyndb_implementations);
++	while (elem != NULL) {
++		prev = PREV(elem, link);
++		UNLINK(dyndb_implementations, elem, link);
++		isc_log_write(dns_lctx, DNS_LOGCATEGORY_DATABASE,
++			      DNS_LOGMODULE_DYNDB, ISC_LOG_INFO,
++			      "unloading DynDB instance '%s'", elem->name);
++		elem->destroy_func(&elem->inst);
++		ENSURE(elem->inst == NULL);
++		unload_library(&elem);
++		elem = prev;
++	}
++	UNLOCK(&dyndb_lock);
++
++	if (exiting == ISC_TRUE)
++		isc_mutex_destroy(&dyndb_lock);
++}
++
++isc_result_t
++dns_dyndb_createctx(isc_mem_t *mctx, isc_hash_t *hctx, isc_log_t *lctx,
++		    dns_view_t *view, dns_zonemgr_t *zmgr,
++		    isc_task_t *task, isc_timermgr_t *tmgr,
++		    dns_dyndbctx_t **dctxp) {
++	dns_dyndbctx_t *dctx;
++
++	REQUIRE(dctxp != NULL && *dctxp == NULL);
++
++	dctx = isc_mem_get(mctx, sizeof(*dctx));
++	if (dctx == NULL)
++		return (ISC_R_NOMEMORY);
++
++	memset(dctx, 0, sizeof(*dctx));
++	if (view != NULL)
++		dns_view_attach(view, &dctx->view);
++	if (zmgr != NULL)
++		dns_zonemgr_attach(zmgr, &dctx->zmgr);
++	if (task != NULL)
++		isc_task_attach(task, &dctx->task);
++	dctx->timermgr = tmgr;
++	dctx->hctx = hctx;
++	dctx->lctx = lctx;
++	dctx->refvar = &isc_lctx;
++
++	isc_mem_attach(mctx, &dctx->mctx);
++	dctx->magic = DNS_DYNDBCTX_MAGIC;
++
++	*dctxp = dctx;
++
++	return (ISC_R_SUCCESS);
++}
++
++void
++dns_dyndb_destroyctx(dns_dyndbctx_t **dctxp) {
++	dns_dyndbctx_t *dctx;
++
++	REQUIRE(dctxp != NULL && DNS_DYNDBCTX_VALID(*dctxp));
++
++	dctx = *dctxp;
++	*dctxp = NULL;
++
++	dctx->magic = 0;
++
++	if (dctx->view != NULL)
++		dns_view_detach(&dctx->view);
++	if (dctx->zmgr != NULL)
++		dns_zonemgr_detach(&dctx->zmgr);
++	if (dctx->task != NULL)
++		isc_task_detach(&dctx->task);
++	dctx->timermgr = NULL;
++	dctx->lctx = NULL;
++
++	isc_mem_putanddetach(&dctx->mctx, dctx, sizeof(*dctx));
++}
+diff --git a/lib/dns/include/dns/Makefile.in b/lib/dns/include/dns/Makefile.in
+index 832db46..a37b35e 100644
+--- a/lib/dns/include/dns/Makefile.in
++++ b/lib/dns/include/dns/Makefile.in
+@@ -23,8 +23,8 @@ top_srcdir =	@top_srcdir@
+ 
+ HEADERS =	acl.h adb.h byaddr.h cache.h callbacks.h cert.h compress.h \
+ 		clientinfo.h db.h dbiterator.h dbtable.h diff.h dispatch.h \
+-		dlz.h dnssec.h ds.h events.h fixedname.h iptable.h journal.h \
+-		keyflags.h keytable.h keyvalues.h lib.h log.h \
++		dlz.h dyndb.h dnssec.h ds.h events.h fixedname.h iptable.h \
++		journal.h keyflags.h keytable.h keyvalues.h lib.h log.h \
+ 		master.h masterdump.h message.h name.h ncache.h nsec.h \
+ 		peer.h portlist.h private.h rbt.h rcode.h \
+ 		rdata.h rdataclass.h rdatalist.h rdataset.h rdatasetiter.h \
+diff --git a/lib/dns/include/dns/dyndb.h b/lib/dns/include/dns/dyndb.h
+new file mode 100644
+index 0000000..832ff27
+--- /dev/null
++++ b/lib/dns/include/dns/dyndb.h
+@@ -0,0 +1,166 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ * Copyright (C) 2008-2011  Red Hat, Inc.
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND AUTHORS DISCLAIM ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL AUTHORS BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++#ifndef DNS_DYNDB_H
++#define DNS_DYNDB_H
++
++#include <isc/types.h>
++
++#include <dns/types.h>
++
++ISC_LANG_BEGINDECLS
++
++/*!
++ * \brief
++ * Context for intializing a dyndb module.
++ *
++ * This structure passes pointers to globals to which a dyndb
++ * module will need access -- the server memory context, hash
++ * context, log context, etc.  The structure doesn't persist
++ * beyond configuring the dyndb module. The module's register function
++ * should attach to all reference-counted variables and its destroy
++ * function should detach from them.
++ */
++struct dns_dyndbctx {
++	unsigned int	magic;
++	isc_mem_t	*mctx;
++	isc_hash_t	*hctx;
++	isc_log_t	*lctx;
++	dns_view_t	*view;
++	dns_zonemgr_t	*zmgr;
++	isc_task_t	*task;
++	isc_timermgr_t	*timermgr;
++	void	*refvar;
++};
++
++#define DNS_DYNDBCTX_MAGIC	ISC_MAGIC('D', 'd', 'b', 'c')
++#define DNS_DYNDBCTX_VALID(d)	ISC_MAGIC_VALID(d, DNS_DYNDBCTX_MAGIC)
++
++/*
++ * API version
++ *
++ * When the API changes, increment DNS_DYNDB_VERSION. If the
++ * change is backward-compatible (e.g., adding a new function call
++ * but not changing or removing an old one), increment DNS_DYNDB_AGE;
++ * if not, set DNS_DYNDB_AGE to 0.
++ */
++#ifndef DNS_DYNDB_VERSION
++#define DNS_DYNDB_VERSION 1
++#define DNS_DYNDB_AGE 0
++#endif
++
++typedef isc_result_t dns_dyndb_register_t(isc_mem_t *mctx,
++					  const char *name,
++					  const char *parameters,
++					  const char *file,
++					  unsigned long line,
++					  const dns_dyndbctx_t *dctx,
++					  void **instp);
++/*%
++ * Called when registering a new driver instance. 'name' must be unique.
++ * 'parameters' contains the driver configuration text. 'dctx' is the
++ * initialization context set up in dns_dyndb_createctx().
++ *
++ * '*instp' must be set to the driver instance handle if the functino
++ * is successful.
++ *
++ * Returns:
++ *\li	#ISC_R_SUCCESS
++ *\li	#ISC_R_NOMEMORY
++ *\li	Other errors are possible
++ */
++
++typedef void dns_dyndb_destroy_t(void **instp);
++/*%
++ * Destroy a driver instance. Dereference any reference-counted
++ * variables passed in 'dctx' and 'inst' in the register function.
++ *
++ * \c *instp must be set to \c NULL by the function before it returns.
++ */
++
++typedef int dns_dyndb_version_t(unsigned int *flags);
++/*%
++ * Return the API version number a dyndb module was compiled with.
++ *
++ * If the returned version number is no greater than than
++ * DNS_DYNDB_VERSION, and no less than DNS_DYNDB_VERSION - DNS_DYNDB_AGE,
++ * then the module is API-compatible with named.
++ *
++ * 'flags' is currently unused and may be NULL, but could be used in
++ * the future to pass back driver capabilities or other information.
++ */
++
++isc_result_t
++dns_dyndb_load(const char *libname, const char *name, const char *parameters,
++	       const char *file, unsigned long line, isc_mem_t *mctx,
++	       const dns_dyndbctx_t *dctx);
++/*%
++ * Load a dyndb module.
++ *
++ * This loads a dyndb module using dlopen() or equivalent, calls its register
++ * function (see dns_dyndb_register_t above), and if successful, adds
++ * the instance handle to a list of dyndb instances so it can be cleaned
++ * up later.
++ *
++ * 'file' and 'line' can be used to indicate the name of the file and
++ * the line number from which the parameters were taken, so that logged
++ * error messages, if any, will display the correct locations.
++ *
++ * Returns:
++ *\li	#ISC_R_SUCCESS
++ *\li	#ISC_R_NOMEMORY
++ *\li	Other errors are possible
++ */
++
++void
++dns_dyndb_cleanup(isc_boolean_t exiting);
++/*%
++ * Shut down and destroy all running dyndb modules.
++ *
++ * 'exiting' indicates whether the server is shutting down,
++ * as opposed to merely being reconfigured.
++ */
++
++isc_result_t
++dns_dyndb_createctx(isc_mem_t *mctx, isc_hash_t *hctx, isc_log_t *lctx,
++		    dns_view_t *view, dns_zonemgr_t *zmgr,
++		    isc_task_t *task, isc_timermgr_t *tmgr,
++		    dns_dyndbctx_t **dctxp);
++/*%
++ * Create a dyndb initialization context structure, with
++ * pointers to structures in the server that the dyndb module will
++ * need to access (view, zone manager, memory context, hash context,
++ * etc). This structure is expected to last only until all dyndb
++ * modules have been loaded and initialized; after that it will be
++ * destroyed with dns_dyndb_destroyctx().
++ *
++ * Returns:
++ *\li	#ISC_R_SUCCESS
++ *\li	#ISC_R_NOMEMORY
++ *\li	Other errors are possible
++ */
++
++void
++dns_dyndb_destroyctx(dns_dyndbctx_t **dctxp);
++/*%
++ * Destroys a dyndb initialization context structure; all
++ * reference-counted members are detached and the structure is freed.
++ */
++
++ISC_LANG_ENDDECLS
++
++#endif /* DNS_DYNDB_H */
+diff --git a/lib/dns/include/dns/log.h b/lib/dns/include/dns/log.h
+index e8c8c10..a3b7e5a 100644
+--- a/lib/dns/include/dns/log.h
++++ b/lib/dns/include/dns/log.h
+@@ -77,6 +77,7 @@ LIBDNS_EXTERNAL_DATA extern isc_logmodule_t dns_modules[];
+ #define DNS_LOGMODULE_DLZ		(&dns_modules[26])
+ #define DNS_LOGMODULE_DNSSEC		(&dns_modules[27])
+ #define DNS_LOGMODULE_CRYPTO		(&dns_modules[28])
++#define DNS_LOGMODULE_DYNDB		(&dns_modules[29])
+ 
+ ISC_LANG_BEGINDECLS
+ 
+diff --git a/lib/dns/include/dns/types.h b/lib/dns/include/dns/types.h
+index 76167c2..5dc03de 100644
+--- a/lib/dns/include/dns/types.h
++++ b/lib/dns/include/dns/types.h
+@@ -60,6 +60,7 @@ typedef struct dns_dbtable			dns_dbtable_t;
+ typedef void					dns_dbversion_t;
+ typedef struct dns_dlzimplementation		dns_dlzimplementation_t;
+ typedef struct dns_dlzdb			dns_dlzdb_t;
++typedef struct dns_dyndbctx			dns_dyndbctx_t;
+ typedef struct dns_sdlzimplementation		dns_sdlzimplementation_t;
+ typedef struct dns_decompress			dns_decompress_t;
+ typedef struct dns_dispatch			dns_dispatch_t;
+diff --git a/lib/dns/lib.c b/lib/dns/lib.c
+index df16fa2..da86efd 100644
+--- a/lib/dns/lib.c
++++ b/lib/dns/lib.c
+@@ -160,7 +160,9 @@ dns_lib_shutdown(void) {
+ 		return;
+ 
+ 	dst_lib_destroy();
+-	isc_hash_destroy();
++
++	if (isc_hashctx != NULL)
++		isc_hash_destroy();
+ #ifndef BIND9
+ 	dns_ecdb_unregister(&dbimp);
+ #endif
+diff --git a/lib/dns/log.c b/lib/dns/log.c
+index 75e0d79..ff9ca65 100644
+--- a/lib/dns/log.c
++++ b/lib/dns/log.c
+@@ -83,6 +83,7 @@ LIBDNS_EXTERNAL_DATA isc_logmodule_t dns_modules[] = {
+ 	{ "dns/dlz",		0 },
+ 	{ "dns/dnssec",		0 },
+ 	{ "dns/crypto",		0 },
++	{ "dns/dyndb",		0 },
+ 	{ NULL, 		0 }
+ };
+ 
+diff --git a/lib/dns/win32/libdns.def b/lib/dns/win32/libdns.def
+index 7661f80..5e20491 100644
+--- a/lib/dns/win32/libdns.def
++++ b/lib/dns/win32/libdns.def
+@@ -230,6 +230,10 @@ dns_dnsseckey_destroy
+ dns_ds_buildrdata
+ dns_ds_digest_supported
+ dns_dumpctx_detach
++dns_dyndb_load
++dns_dyndb_cleanup
++dns_dyndb_createctx
++dns_dyndb_destroyctx
+ dns_fwdtable_add
+ dns_fwdtable_create
+ dns_fwdtable_destroy
+diff --git a/lib/export/isc/Makefile.in b/lib/export/isc/Makefile.in
+index a5f8bd0..4f4a9f7 100644
+--- a/lib/export/isc/Makefile.in
++++ b/lib/export/isc/Makefile.in
+@@ -64,8 +64,8 @@ WIN32OBJS = 	win32/condition.@O@ win32/dir.@O@ win32/file.@O@ \
+ # Alphabetically
+ OBJS =		@ISC_EXTRA_OBJS@ \
+ 		assertions.@O@ backtrace.@O@ backtrace-emptytbl.@O@ base32.@O@ \
+-		base64.@O@ buffer.@O@ bufferlist.@O@ counter.@O@ \
+-		error.@O@ event.@O@ \
++		base64.@O@ buffer.@O@ bufferlist.@O@ commandline.@O@ \
++		counter.@O@ error.@O@ event.@O@ \
+ 		hash.@O@ hex.@O@ hmacmd5.@O@ hmacsha.@O@ \
+ 		inet_aton.@O@ iterated_hash.@O@ lex.@O@ lfsr.@O@ log.@O@ \
+ 		md5.@O@ mutexblock.@O@ netaddr.@O@ netscope.@O@ \
+@@ -86,7 +86,7 @@ ISCDRIVERSRCS =	mem.c task.c lib.c timer.c heap.c
+ 
+ SRCS =		@ISC_EXTRA_SRCS@ \
+ 		assertions.c backtrace.c backtrace-emptytbl.c base32.c \
+-		base64.c buffer.c bufferlist.c counter.c \
++		base64.c buffer.c bufferlist.c counter.c commandline.c \
+ 		error.c event.c \
+ 		hash.c hex.c hmacmd5.c hmacsha.c \
+ 		inet_aton.c iterated_hash.c lex.c log.c lfsr.c \
+diff --git a/lib/isc/Makefile.in b/lib/isc/Makefile.in
+index df62ec9..4d3a0af 100644
+--- a/lib/isc/Makefile.in
++++ b/lib/isc/Makefile.in
+@@ -37,7 +37,7 @@ CWARNINGS =
+ 
+ # Alphabetically
+ UNIXOBJS =	@ISC_ISCIPV6_O@ @ISC_ISCPK11_API_O@ \
+-		unix/app.@O@ unix/dir.@O@ unix/entropy.@O@ \
++		unix/app.@O@ unix/dir.@O@ unix/entropy.@O@ unix/errno.@O@ \
+ 		unix/errno2result.@O@ unix/file.@O@ unix/fsaccess.@O@ \
+ 		unix/interfaceiter.@O@ unix/keyboard.@O@ unix/net.@O@ \
+ 		unix/os.@O@ unix/resource.@O@ unix/socket.@O@ unix/stdio.@O@ \
+@@ -49,9 +49,9 @@ THREADOPTOBJS = @ISC_THREAD_DIR@/condition.@O@ @ISC_THREAD_DIR@/mutex.@O@
+ 
+ THREADOBJS =	@THREADOPTOBJS@ @ISC_THREAD_DIR@/thread.@O@
+ 
+-WIN32OBJS = 	win32/condition.@O@ win32/dir.@O@ win32/file.@O@ \
+-		win32/fsaccess.@O@ win32/once.@O@ win32/stdtime.@O@ \
+-		win32/thread.@O@ win32/time.@O@
++WIN32OBJS = 	win32/condition.@O@ win32/dir.@O@ win32/errno.@O@ \
++		win32/file.@O@ win32/fsaccess.@O@ win32/once.@O@ \
++		win32/stdtime.@O@ win32/thread.@O@ win32/time.@O@
+ 
+ # Alphabetically
+ OBJS =		@ISC_EXTRA_OBJS@ @ISC_PK11_O@ @ISC_PK11_RESULT_O@ \
+diff --git a/lib/isc/commandline.c b/lib/isc/commandline.c
+index aca1203..26ad23c 100644
+--- a/lib/isc/commandline.c
++++ b/lib/isc/commandline.c
+@@ -68,6 +68,7 @@
+ #include <stdio.h>
+ 
+ #include <isc/commandline.h>
++#include <isc/mem.h>
+ #include <isc/msgs.h>
+ #include <isc/string.h>
+ #include <isc/util.h>
+@@ -223,3 +224,62 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
+ 
+ 	return (isc_commandline_option);
+ }
++
++isc_result_t
++isc_commandline_strtoargv(isc_mem_t *mctx, char *s, unsigned int *argcp,
++			  char ***argvp, unsigned int n)
++{
++	isc_result_t result;
++
++ restart:
++	/* Discard leading whitespace. */
++	while (*s == ' ' || *s == '\t')
++		s++;
++
++	if (*s == '\0') {
++		/* We have reached the end of the string. */
++		*argcp = n;
++		*argvp = isc_mem_get(mctx, n * sizeof(char *));
++		if (*argvp == NULL)
++			return (ISC_R_NOMEMORY);
++	} else {
++		char *p = s;
++		while (*p != ' ' && *p != '\t' && *p != '\0' && *p != '{') {
++			if (*p == '\n') {
++				*p = ' ';
++				goto restart;
++			}
++			p++;
++		}
++
++		/* do "grouping", items between { and } are one arg */
++		if (*p == '{') {
++			char *t = p;
++			/*
++			 * shift all characters to left by 1 to get rid of '{'
++			 */
++			while (*t != '\0') {
++				t++;
++				*(t-1) = *t;
++			}
++			while (*p != '\0' && *p != '}') {
++				p++;
++			}
++			/* get rid of '}' character */
++			if (*p == '}') {
++				*p = '\0';
++				p++;
++			}
++			/* normal case, no "grouping" */
++		} else if (*p != '\0')
++			*p++ = '\0';
++
++		result = isc_commandline_strtoargv(mctx, p,
++						   argcp, argvp, n + 1);
++		if (result != ISC_R_SUCCESS)
++			return (result);
++		(*argvp)[n] = s;
++	}
++
++	return (ISC_R_SUCCESS);
++}
+diff --git a/lib/isc/hash.c b/lib/isc/hash.c
+index f1d68c7..c3712e6 100644
+--- a/lib/isc/hash.c
++++ b/lib/isc/hash.c
+@@ -15,8 +15,6 @@
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+-/* $Id: hash.c,v 1.16 2009/09/01 00:22:28 jinmei Exp $ */
+-
+ /*! \file
+  * Some portion of this code was derived from universal hash function
+  * libraries of Rice University.
+@@ -101,7 +99,8 @@ struct isc_hash {
+ 
+ static isc_mutex_t createlock;
+ static isc_once_t once = ISC_ONCE_INIT;
+-static isc_hash_t *hash = NULL;
++
++LIBISC_EXTERNAL_DATA isc_hash_t *isc_hashctx = NULL;
+ 
+ static unsigned char maptolower[] = {
+ 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+@@ -224,14 +223,15 @@ isc_hash_create(isc_mem_t *mctx, isc_entropy_t *entropy, size_t limit) {
+ 	isc_result_t result = ISC_R_SUCCESS;
+ 
+ 	REQUIRE(mctx != NULL);
+-	INSIST(hash == NULL);
++	INSIST(isc_hashctx == NULL);
+ 
+ 	RUNTIME_CHECK(isc_once_do(&once, initialize_lock) == ISC_R_SUCCESS);
+ 
+ 	LOCK(&createlock);
+ 
+-	if (hash == NULL)
+-		result = isc_hash_ctxcreate(mctx, entropy, limit, &hash);
++	if (isc_hashctx == NULL)
++		result = isc_hash_ctxcreate(mctx, entropy, limit,
++					    &isc_hashctx);
+ 
+ 	UNLOCK(&createlock);
+ 
+@@ -283,9 +283,9 @@ isc_hash_ctxinit(isc_hash_t *hctx) {
+ 
+ void
+ isc_hash_init() {
+-	INSIST(hash != NULL && VALID_HASH(hash));
++	INSIST(isc_hashctx != NULL && VALID_HASH(isc_hashctx));
+ 
+-	isc_hash_ctxinit(hash);
++	isc_hash_ctxinit(isc_hashctx);
+ }
+ 
+ void
+@@ -350,12 +350,12 @@ void
+ isc_hash_destroy() {
+ 	unsigned int refs;
+ 
+-	INSIST(hash != NULL && VALID_HASH(hash));
++	INSIST(isc_hashctx != NULL && VALID_HASH(isc_hashctx));
+ 
+-	isc_refcount_decrement(&hash->refcnt, &refs);
++	isc_refcount_decrement(&isc_hashctx->refcnt, &refs);
+ 	INSIST(refs == 0);
+ 
+-	destroy(&hash);
++	destroy(&isc_hashctx);
+ }
+ 
+ static inline unsigned int
+@@ -397,8 +397,8 @@ unsigned int
+ isc_hash_calc(const unsigned char *key, unsigned int keylen,
+ 	      isc_boolean_t case_sensitive)
+ {
+-	INSIST(hash != NULL && VALID_HASH(hash));
+-	REQUIRE(keylen <= hash->limit);
++	INSIST(isc_hashctx != NULL && VALID_HASH(isc_hashctx));
++	REQUIRE(keylen <= isc_hashctx->limit);
+ 
+-	return (hash_calc(hash, key, keylen, case_sensitive));
++	return (hash_calc(isc_hashctx, key, keylen, case_sensitive));
+ }
+diff --git a/lib/isc/include/isc/Makefile.in b/lib/isc/include/isc/Makefile.in
+index 38af3f9..7ca1170 100644
+--- a/lib/isc/include/isc/Makefile.in
++++ b/lib/isc/include/isc/Makefile.in
+@@ -27,8 +27,8 @@ top_srcdir =	@top_srcdir@
+ # install target below.
+ #
+ HEADERS =	app.h assertions.h base64.h bind9.h bitstring.h boolean.h \
+-		buffer.h bufferlist.h commandline.h counter.h entropy.h error.h event.h \
+-		eventclass.h file.h formatcheck.h fsaccess.h \
++		buffer.h bufferlist.h commandline.h counter.h entropy.h errno.h \
++		error.h event.h eventclass.h file.h formatcheck.h fsaccess.h \
+ 		hash.h heap.h hex.h hmacmd5.h hmacsha.h \
+ 		httpd.h \
+ 		interfaceiter.h @ISC_IPV6_H@ iterated_hash.h lang.h lex.h \
+diff --git a/lib/isc/include/isc/commandline.h b/lib/isc/include/isc/commandline.h
+index 384640a..d35ccbf 100644
+--- a/lib/isc/include/isc/commandline.h
++++ b/lib/isc/include/isc/commandline.h
+@@ -15,8 +15,6 @@
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+-/* $Id: commandline.h,v 1.16 2007/06/19 23:47:18 tbox Exp $ */
+-
+ #ifndef ISC_COMMANDLINE_H
+ #define ISC_COMMANDLINE_H 1
+ 
+@@ -25,6 +23,7 @@
+ #include <isc/boolean.h>
+ #include <isc/lang.h>
+ #include <isc/platform.h>
++#include <isc/result.h>
+ 
+ /*% Index into parent argv vector. */
+ LIBISC_EXTERNAL_DATA extern int isc_commandline_index;
+@@ -41,9 +40,22 @@ LIBISC_EXTERNAL_DATA extern isc_boolean_t isc_commandline_reset;
+ 
+ ISC_LANG_BEGINDECLS
+ 
+-/*% parse command line */
+ int
+ isc_commandline_parse(int argc, char * const *argv, const char *options);
++/*%<
++ * Parse a command line (similar to getopt())
++ */
++
++isc_result_t
++isc_commandline_strtoargv(isc_mem_t *mctx, char *s, unsigned int *argcp,
++			  char ***argvp, unsigned int n);
++/*%<
++ * Tokenize the string "s" into whitespace-separated words,
++ * returning the number of words in '*argcp' and an array
++ * of pointers to the words in '*argvp'.  The caller
++ * must free the array using isc_mem_free().  The string
++ * is modified in-place.
++ */
+ 
+ ISC_LANG_ENDDECLS
+ 
+diff --git a/lib/isc/include/isc/errno.h b/lib/isc/include/isc/errno.h
+new file mode 100644
+index 0000000..47ec90f
+--- /dev/null
++++ b/lib/isc/include/isc/errno.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2016  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++#ifndef ISC_ERRNO_H
++#define ISC_ERRNO_H 1
++
++/*! \file isc/file.h */
++
++#include <isc/types.h>
++
++ISC_LANG_BEGINDECLS
++
++isc_result_t
++isc_errno_toresult(int err);
++/*!<
++ * \brief Convert a POSIX errno value to an ISC result code.
++ */
++ISC_LANG_ENDDECLS
++
++#endif /* ISC_ERRNO_H */
+diff --git a/lib/isc/include/isc/hash.h b/lib/isc/include/isc/hash.h
+index ca04b4e..5ef1e4c 100644
+--- a/lib/isc/include/isc/hash.h
++++ b/lib/isc/include/isc/hash.h
+@@ -15,8 +15,6 @@
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+-/* $Id: hash.h,v 1.12 2009/01/17 23:47:43 tbox Exp $ */
+-
+ #ifndef ISC_HASH_H
+ #define ISC_HASH_H 1
+ 
+@@ -81,6 +79,8 @@
+  ***/
+ ISC_LANG_BEGINDECLS
+ 
++LIBDNS_EXTERNAL_DATA extern isc_hash_t *isc_hashctx;
++
+ isc_result_t
+ isc_hash_ctxcreate(isc_mem_t *mctx, isc_entropy_t *entropy, unsigned int limit,
+ 		   isc_hash_t **hctx);
+diff --git a/lib/isc/include/isc/lex.h b/lib/isc/include/isc/lex.h
+index 8612150..6ce1465 100644
+--- a/lib/isc/include/isc/lex.h
++++ b/lib/isc/include/isc/lex.h
+@@ -90,6 +90,7 @@ ISC_LANG_BEGINDECLS
+ #define ISC_LEXOPT_ESCAPE		0x100	/*%< Recognize escapes. */
+ #define ISC_LEXOPT_QSTRINGMULTILINE	0x200	/*%< Allow multiline "" strings */
+ #define ISC_LEXOPT_OCTAL		0x400	/*%< Expect a octal number. */
++#define ISC_LEXOPT_BTEXT		0x800	/*%< Bracketed text. */
+ /*@}*/
+ /*@{*/
+ /*!
+@@ -122,7 +123,8 @@ typedef enum {
+ 	isc_tokentype_eof = 5,
+ 	isc_tokentype_initialws = 6,
+ 	isc_tokentype_special = 7,
+-	isc_tokentype_nomore = 8
++	isc_tokentype_nomore = 8,
++	isc_tokentype_btext = 8
+ } isc_tokentype_t;
+ 
+ typedef union {
+@@ -412,6 +414,23 @@ isc_lex_setsourcename(isc_lex_t *lex, const char *name);
+  * \li	#ISC_R_NOTFOUND - there are no sources.
+  */
+ 
++isc_result_t
++isc_lex_setsourceline(isc_lex_t *lex, unsigned long line);
++/*%<
++ * Assigns a new line number to the input source. This can be used
++ * when parsing a buffer that's been excerpted from the middle a file,
++ * allowing logged messages to display the correct line number,
++ * rather than the line number within the buffer.
++ *
++ * Requires:
++ *
++ * \li	'lex' is a valid lexer.
++ *
++ * Returns:
++ * \li	#ISC_R_SUCCESS
++ * \li	#ISC_R_NOTFOUND - there are no sources.
++ */
++
+ isc_boolean_t
+ isc_lex_isfile(isc_lex_t *lex);
+ /*%<
+diff --git a/lib/isc/lex.c b/lib/isc/lex.c
+index 1dc2332..46fec84 100644
+--- a/lib/isc/lex.c
++++ b/lib/isc/lex.c
+@@ -62,6 +62,7 @@ struct isc_lex {
+ 	unsigned int			comments;
+ 	isc_boolean_t			comment_ok;
+ 	isc_boolean_t			last_was_eol;
++	unsigned int			brace_count;
+ 	unsigned int			paren_count;
+ 	unsigned int			saved_paren_count;
+ 	isc_lexspecials_t		specials;
+@@ -110,6 +111,7 @@ isc_lex_create(isc_mem_t *mctx, size_t max_token, isc_lex_t **lexp) {
+ 	lex->comments = 0;
+ 	lex->comment_ok = ISC_TRUE;
+ 	lex->last_was_eol = ISC_TRUE;
++	lex->brace_count = 0;
+ 	lex->paren_count = 0;
+ 	lex->saved_paren_count = 0;
+ 	memset(lex->specials, 0, 256);
+@@ -309,7 +311,8 @@ typedef enum {
+ 	lexstate_ccomment,
+ 	lexstate_ccommentend,
+ 	lexstate_eatline,
+-	lexstate_qstring
++	lexstate_qstring,
++	lexstate_btext
+ } lexstate;
+ 
+ #define IWSEOL (ISC_LEXOPT_INITIALWS | ISC_LEXOPT_EOL)
+@@ -392,10 +395,17 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
+ 	    source->at_eof)
+ 	{
+ 		if ((options & ISC_LEXOPT_DNSMULTILINE) != 0 &&
+-		    lex->paren_count != 0) {
++		    lex->paren_count != 0)
++		{
+ 			lex->paren_count = 0;
+ 			return (ISC_R_UNBALANCED);
+ 		}
++		if ((options & ISC_LEXOPT_BTEXT) != 0 &&
++		    lex->brace_count != 0)
++		{
++			lex->brace_count = 0;
++			return (ISC_R_UNBALANCED);
++		}
+ 		if ((options & ISC_LEXOPT_EOF) != 0) {
+ 			tokenp->type = isc_tokentype_eof;
+ 			return (ISC_R_SUCCESS);
+@@ -507,6 +517,12 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
+ 					result = ISC_R_UNBALANCED;
+ 					goto done;
+ 				}
++				if ((options & ISC_LEXOPT_BTEXT) != 0 &&
++				    lex->brace_count != 0) {
++					lex->brace_count = 0;
++					result = ISC_R_UNBALANCED;
++					goto done;
++				}
+ 				if ((options & ISC_LEXOPT_EOF) == 0) {
+ 					result = ISC_R_EOF;
+ 					goto done;
+@@ -539,21 +555,34 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
+ 			} else if (lex->specials[c]) {
+ 				lex->last_was_eol = ISC_FALSE;
+ 				if ((c == '(' || c == ')') &&
+-				    (options & ISC_LEXOPT_DNSMULTILINE) != 0) {
++				    (options & ISC_LEXOPT_DNSMULTILINE) != 0)
++				{
+ 					if (c == '(') {
+ 						if (lex->paren_count == 0)
+ 							options &= ~IWSEOL;
+ 						lex->paren_count++;
+ 					} else {
+ 						if (lex->paren_count == 0) {
+-						    result = ISC_R_UNBALANCED;
+-						    goto done;
++							result =
++							      ISC_R_UNBALANCED;
++							goto done;
+ 						}
+ 						lex->paren_count--;
+ 						if (lex->paren_count == 0)
+-							options =
+-								saved_options;
++							options = saved_options;
++					}
++					continue;
++				} else if (c == '{' &&
++					   (options & ISC_LEXOPT_BTEXT) != 0)
++				{
++					if (lex->brace_count != 0) {
++						result = ISC_R_UNBALANCED;
++						goto done;
+ 					}
++					lex->brace_count++;
++					options &= ~IWSEOL;
++					state = lexstate_btext;
++					no_comments = ISC_TRUE;
+ 					continue;
+ 				}
+ 				tokenp->type = isc_tokentype_special;
+@@ -769,6 +798,55 @@ isc_lex_gettoken(isc_lex_t *lex, unsigned int options, isc_token_t *tokenp) {
+ 				remaining--;
+ 			}
+ 			break;
++		case lexstate_btext:
++			if (c == EOF) {
++				result = ISC_R_UNEXPECTEDEND;
++				goto done;
++			}
++			if (c == '{') {
++				if (escaped) {
++					escaped = ISC_FALSE;
++				} else {
++					lex->brace_count++;
++				}
++			} else if (c == '}') {
++				if (escaped) {
++					escaped = ISC_FALSE;
++				} else {
++					INSIST(lex->brace_count > 0);
++					lex->brace_count--;
++				}
++
++				if (lex->brace_count == 0) {
++					tokenp->type = isc_tokentype_btext;
++					tokenp->value.as_textregion.base =
++						lex->data;
++					tokenp->value.as_textregion.length =
++						(unsigned int) (lex->max_token -
++								remaining);
++					no_comments = ISC_FALSE;
++					done = ISC_TRUE;
++					break;
++				}
++			}
++
++			if (c == '\\' && !escaped)
++				escaped = ISC_TRUE;
++			else
++				escaped = ISC_FALSE;
++
++			if (remaining == 0U) {
++				result = grow_data(lex, &remaining,
++						   &curr, &prev);
++				if (result != ISC_R_SUCCESS)
++					goto done;
++			}
++			INSIST(remaining > 0U);
++			prev = curr;
++			*curr++ = c;
++			*curr = '\0';
++			remaining--;
++			break;
+ 		default:
+ 			FATAL_ERROR(__FILE__, __LINE__,
+ 				    isc_msgcat_get(isc_msgcat, ISC_MSGSET_LEX,
+@@ -895,7 +973,6 @@ isc_lex_getlasttokentext(isc_lex_t *lex, isc_token_t *tokenp, isc_region_t *r)
+ 		    source->ignored;
+ }
+ 
+-
+ char *
+ isc_lex_getsourcename(isc_lex_t *lex) {
+ 	inputsource *source;
+@@ -922,7 +999,6 @@ isc_lex_getsourceline(isc_lex_t *lex) {
+ 	return (source->line);
+ }
+ 
+-
+ isc_result_t
+ isc_lex_setsourcename(isc_lex_t *lex, const char *name) {
+ 	inputsource *source;
+@@ -932,7 +1008,7 @@ isc_lex_setsourcename(isc_lex_t *lex, const char *name) {
+ 	source = HEAD(lex->sources);
+ 
+ 	if (source == NULL)
+-		return(ISC_R_NOTFOUND);
++		return (ISC_R_NOTFOUND);
+ 	newname = isc_mem_strdup(lex->mctx, name);
+ 	if (newname == NULL)
+ 		return (ISC_R_NOMEMORY);
+@@ -941,6 +1017,20 @@ isc_lex_setsourcename(isc_lex_t *lex, const char *name) {
+ 	return (ISC_R_SUCCESS);
+ }
+ 
++isc_result_t
++isc_lex_setsourceline(isc_lex_t *lex, unsigned long line) {
++	inputsource *source;
++
++	REQUIRE(VALID_LEX(lex));
++	source = HEAD(lex->sources);
++
++	if (source == NULL)
++		return (ISC_R_NOTFOUND);
++
++	source->line = line;
++	return (ISC_R_SUCCESS);
++}
++
+ isc_boolean_t
+ isc_lex_isfile(isc_lex_t *lex) {
+ 	inputsource *source;
+diff --git a/lib/isc/tests/Makefile.in b/lib/isc/tests/Makefile.in
+index 564d3cd..f04396e 100644
+--- a/lib/isc/tests/Makefile.in
++++ b/lib/isc/tests/Makefile.in
+@@ -12,8 +12,6 @@
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+-# $Id$
+-
+ srcdir =	@srcdir@
+ VPATH =		@srcdir@
+ top_srcdir =	@top_srcdir@
+@@ -37,13 +35,14 @@ LIBS =		@LIBS@ @ATFLIBS@
+ OBJS =		isctest.@O@
+ SRCS =		isctest.c taskpool_test.c socket_test.c hash_test.c \
+ 		sockaddr_test.c symtab_test.c task_test.c queue_test.c \
+-		parse_test.c pool_test.c regex_test.c safe_test.c
++		parse_test.c pool_test.c regex_test.c safe_test.c \
++		errno_test.c
+ 
+ SUBDIRS =
+ TARGETS =	taskpool_test@EXEEXT@ socket_test@EXEEXT@ hash_test@EXEEXT@ \
+ 		sockaddr_test@EXEEXT@ symtab_test@EXEEXT@ task_test@EXEEXT@ \
+ 		queue_test@EXEEXT@ parse_test@EXEEXT@ pool_test@EXEEXT@ \
+-		regex_test@EXEEXT@ safe_test@EXEEXT@
++		regex_test@EXEEXT@ safe_test@EXEEXT@ errno_test@EXEEXT@
+ 
+ @BIND9_MAKE_RULES@
+ 
+@@ -91,6 +90,10 @@ safe_test@EXEEXT@: safe_test.@O@ ${ISCDEPLIBS}
+ 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ \
+ 			safe_test.@O@ ${ISCLIBS} ${LIBS}
+ 
++
++errno_test@EXEEXT@: errno_test.@O@ ${ISCDEPLIBS}
++	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ \
++			errno_test.@O@ ${ISCLIBS} ${LIBS}
+ unit::
+ 	sh ${top_srcdir}/unit/unittest.sh
+ 
+diff --git a/lib/isc/tests/errno_test.c b/lib/isc/tests/errno_test.c
+new file mode 100644
+index 0000000..253a857
+--- /dev/null
++++ b/lib/isc/tests/errno_test.c
+@@ -0,0 +1,102 @@
++/*
++ * Copyright (C) 2016  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++#include <config.h>
++
++#include <stdio.h>
++#include <sys/errno.h>
++
++#include <atf-c.h>
++
++#include <isc/errno.h>
++#include <isc/result.h>
++
++typedef struct {
++	int err;
++	isc_result_t result;
++} testpair_t;
++
++testpair_t testpair[] = {
++	{ EPERM, ISC_R_NOPERM },
++	{ ENOENT, ISC_R_FILENOTFOUND },
++	{ EIO, ISC_R_IOERROR },
++	{ EBADF, ISC_R_INVALIDFILE },
++	{ ENOMEM, ISC_R_NOMEMORY },
++	{ EACCES, ISC_R_NOPERM },
++	{ EEXIST, ISC_R_FILEEXISTS },
++	{ ENOTDIR, ISC_R_INVALIDFILE },
++	{ EINVAL, ISC_R_INVALIDFILE },
++	{ ENFILE, ISC_R_TOOMANYOPENFILES },
++	{ EMFILE, ISC_R_TOOMANYOPENFILES },
++	{ EPIPE, ISC_R_CONNECTIONRESET },
++	{ ENAMETOOLONG, ISC_R_INVALIDFILE },
++	{ ELOOP, ISC_R_INVALIDFILE },
++#ifdef EOVERFLOW
++	{ EOVERFLOW, ISC_R_RANGE },
++#endif
++#ifdef EAFNOSUPPORT
++	{ EAFNOSUPPORT, ISC_R_FAMILYNOSUPPORT },
++#endif
++#ifdef EADDRINUSE
++	{ EADDRINUSE, ISC_R_ADDRINUSE },
++#endif
++	{ EADDRNOTAVAIL, ISC_R_ADDRNOTAVAIL },
++#ifdef ENETDOWN
++	{ ENETDOWN, ISC_R_NETDOWN },
++#endif
++#ifdef ENETUNREACH
++	{ ENETUNREACH, ISC_R_NETUNREACH },
++#endif
++#ifdef ECONNABORTED
++	{ ECONNABORTED, ISC_R_CONNECTIONRESET },
++#endif
++#ifdef ECONNRESET
++	{ ECONNRESET, ISC_R_CONNECTIONRESET },
++#endif
++#ifdef ENOBUFS
++	{ ENOBUFS, ISC_R_NORESOURCES },
++#endif
++#ifdef ENOTCONN
++	{ ENOTCONN, ISC_R_NOTCONNECTED },
++#endif
++#ifdef ETIMEDOUT
++	{ ETIMEDOUT, ISC_R_TIMEDOUT },
++#endif
++	{ ECONNREFUSED, ISC_R_CONNREFUSED },
++#ifdef EHOSTDOWN
++	{ EHOSTDOWN, ISC_R_HOSTDOWN },
++#endif
++#ifdef EHOSTUNREACH
++	{ EHOSTUNREACH, ISC_R_HOSTUNREACH },
++#endif
++	{ 0, ISC_R_UNEXPECTED }
++};
++
++ATF_TC(isc_errno_toresult);
++ATF_TC_HEAD(isc_errno_toresult, tc) {
++	atf_tc_set_md_var(tc, "descr", "convert errno to ISC result");
++}
++ATF_TC_BODY(isc_errno_toresult, tc) {
++	isc_result_t result, expect;
++	size_t i;
++
++	for (i = 0; i < sizeof(testpair)/sizeof(testpair[0]); i++) {
++		result = isc_errno_toresult(testpair[i].err);
++		expect = testpair[i].result;
++		ATF_CHECK(result == expect);
++	}
++}
++
++/*
++ * Main
++ */
++ATF_TP_ADD_TCS(tp) {
++	ATF_TP_ADD_TC(tp, isc_errno_toresult);
++	return (atf_no_error());
++}
++
+diff --git a/lib/isc/unix/Makefile.in b/lib/isc/unix/Makefile.in
+index 0595fa2..8f32119 100644
+--- a/lib/isc/unix/Makefile.in
++++ b/lib/isc/unix/Makefile.in
+@@ -13,8 +13,6 @@
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+-# $Id: Makefile.in,v 1.44 2009/12/05 23:31:41 each Exp $
+-
+ srcdir =	@srcdir@
+ VPATH =		@srcdir@
+ top_srcdir =	@top_srcdir@
+@@ -30,14 +28,14 @@ CWARNINGS =
+ 
+ # Alphabetically
+ OBJS =		@ISC_IPV6_O@ @ISC_PK11_API_O@ \
+-		app.@O@ dir.@O@ entropy.@O@ errno2result.@O@ file.@O@ \
+-		fsaccess.@O@ interfaceiter.@O@ keyboard.@O@ net.@O@ \
++		app.@O@ dir.@O@ entropy.@O@ errno.@O@ errno2result.@O@ \
++		file.@O@ fsaccess.@O@ interfaceiter.@O@ keyboard.@O@ net.@O@ \
+ 		os.@O@ resource.@O@ socket.@O@ stdio.@O@ stdtime.@O@ \
+ 		strerror.@O@ syslog.@O@ time.@O@
+ 
+ # Alphabetically
+ SRCS =		@ISC_IPV6_C@ @ISC_PK11_API_C@ \
+-		app.c dir.c entropy.c errno2result.c file.c \
++		app.c dir.c entropy.c errno.c errno2result.c file.c \
+ 		fsaccess.c interfaceiter.c keyboard.c net.c \
+ 		os.c resource.c socket.c stdio.c stdtime.c \
+ 		strerror.c syslog.c time.c
+diff --git a/lib/isc/unix/errno.c b/lib/isc/unix/errno.c
+new file mode 100644
+index 0000000..c5f1c56
+--- /dev/null
++++ b/lib/isc/unix/errno.c
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2016  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++/*! \file */
++
++#include <config.h>
++
++#include <isc/errno.h>
++#include <isc/util.h>
++
++#include "errno2result.h"
++
++isc_result_t
++isc_errno_toresult(int err) {
++	return (isc___errno2result(err, ISC_FALSE, 0, 0));
++}
+diff --git a/lib/isc/unix/errno2result.c b/lib/isc/unix/errno2result.c
+index 2951ef8..2309794 100644
+--- a/lib/isc/unix/errno2result.c
++++ b/lib/isc/unix/errno2result.c
+@@ -34,7 +34,9 @@
+  * not already there.
+  */
+ isc_result_t
+-isc___errno2result(int posixerrno, const char *file, unsigned int line) {
++isc___errno2result(int posixerrno, isc_boolean_t dolog,
++		   const char *file, unsigned int line)
++{
+ 	char strbuf[ISC_STRERRORSIZE];
+ 
+ 	switch (posixerrno) {
+@@ -108,10 +110,12 @@ isc___errno2result(int posixerrno, const char *file, unsigned int line) {
+ 	case ECONNREFUSED:
+ 		return (ISC_R_CONNREFUSED);
+ 	default:
+-		isc__strerror(posixerrno, strbuf, sizeof(strbuf));
+-		UNEXPECTED_ERROR(file, line, "unable to convert errno "
+-				 "to isc_result: %d: %s",
+-				 posixerrno, strbuf);
++		if (dolog) {
++			isc__strerror(posixerrno, strbuf, sizeof(strbuf));
++			UNEXPECTED_ERROR(file, line, "unable to convert errno "
++					 "to isc_result: %d: %s",
++					 posixerrno, strbuf);
++		}
+ 		/*
+ 		 * XXXDCL would be nice if perhaps this function could
+ 		 * return the system's error string, so the caller
+diff --git a/lib/isc/unix/errno2result.h b/lib/isc/unix/errno2result.h
+index 1e49ed1..9c6b052 100644
+--- a/lib/isc/unix/errno2result.h
++++ b/lib/isc/unix/errno2result.h
+@@ -15,8 +15,6 @@
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+-/* $Id$ */
+-
+ #ifndef UNIX_ERRNO2RESULT_H
+ #define UNIX_ERRNO2RESULT_H 1
+ 
+@@ -31,10 +29,11 @@
+ 
+ ISC_LANG_BEGINDECLS
+ 
+-#define isc__errno2result(x) isc___errno2result(x, __FILE__, __LINE__)
++#define isc__errno2result(x) isc___errno2result(x, ISC_TRUE, __FILE__, __LINE__)
+ 
+ isc_result_t
+-isc___errno2result(int posixerrno, const char *file, unsigned int line);
++isc___errno2result(int posixerrno, isc_boolean_t dolog,
++		   const char *file, unsigned int line);
+ 
+ ISC_LANG_ENDDECLS
+ 
+diff --git a/lib/isc/win32/Makefile.in b/lib/isc/win32/Makefile.in
+index c129e31..9cd717d 100644
+--- a/lib/isc/win32/Makefile.in
++++ b/lib/isc/win32/Makefile.in
+@@ -13,8 +13,6 @@
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+-# $Id: Makefile.in,v 1.14 2009/12/05 23:31:41 each Exp $
+-
+ srcdir =	@srcdir@
+ VPATH =		@srcdir@
+ top_srcdir =	@top_srcdir@
+@@ -27,11 +25,11 @@ CDEFINES =
+ CWARNINGS =
+ 
+ # Alphabetically
+-OBJS =		condition.@O@ dir.@O@ file.@O@ fsaccess.@O@ once.@O@ \
+-		stdtime.@O@ thread.@O@ time.@O@
++OBJS =		condition.@O@ dir.@O@ errno.@O@ file.@O@ fsaccess.@O@ \
++		once.@O@ stdtime.@O@ thread.@O@ time.@O@
+ 
+ # Alphabetically
+-SRCS =		condition.c dir.c file.c once.c fsaccess.c \
++SRCS =		condition.c dir.c errno.c file.c once.c fsaccess.c \
+ 		stdtime.c thread.c time.c
+ 
+ SUBDIRS =	include
+diff --git a/lib/isc/win32/errno.c b/lib/isc/win32/errno.c
+new file mode 100644
+index 0000000..5c45496
+--- /dev/null
++++ b/lib/isc/win32/errno.c
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2016  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
++ */
++
++/*! \file */
++
++#include <config.h>
++
++#include "errno2result.h"
++
++isc_result_t
++isc_errno_toresult(int err) {
++	return (isc__errno2resultx(err, ISC_FALSE, 0, 0));
++}
+diff --git a/lib/isc/win32/errno2result.c b/lib/isc/win32/errno2result.c
+index c3d54d6..c9a3ab5 100644
+--- a/lib/isc/win32/errno2result.c
++++ b/lib/isc/win32/errno2result.c
+@@ -32,7 +32,9 @@
+  * not already there.
+  */
+ isc_result_t
+-isc__errno2resultx(int posixerrno, const char *file, int line) {
++isc__errno2resultx(int posixerrno, isc_boolean_t dolog,
++		   const char *file, int line)
++{
+ 	char strbuf[ISC_STRERRORSIZE];
+ 
+ 	switch (posixerrno) {
+@@ -99,9 +101,13 @@ isc__errno2resultx(int posixerrno, const char *file, int line) {
+ 	case WSAENOBUFS:
+ 		return (ISC_R_NORESOURCES);
+ 	default:
+-		isc__strerror(posixerrno, strbuf, sizeof(strbuf));
+-		UNEXPECTED_ERROR(file, line, "unable to convert errno "
+-				 "to isc_result: %d: %s", posixerrno, strbuf);
++		if (dolog) {
++			isc__strerror(posixerrno, strbuf, sizeof(strbuf));
++			UNEXPECTED_ERROR(file, line,
++					 "unable to convert errno "
++					 "to isc_result: %d: %s",
++					 posixerrno, strbuf);
++		}
+ 		/*
+ 		 * XXXDCL would be nice if perhaps this function could
+ 		 * return the system's error string, so the caller
+diff --git a/lib/isc/win32/errno2result.h b/lib/isc/win32/errno2result.h
+index 41682db..cc9115e 100644
+--- a/lib/isc/win32/errno2result.h
++++ b/lib/isc/win32/errno2result.h
+@@ -30,10 +30,11 @@
+ ISC_LANG_BEGINDECLS
+ 
+ #define isc__errno2result(posixerrno) \
+-	isc__errno2resultx(posixerrno, __FILE__, __LINE__)
++	isc__errno2resultx(posixerrno, ISC_TRUE, __FILE__, __LINE__)
+ 
+ isc_result_t
+-isc__errno2resultx(int posixerrno, const char *file, int line);
++isc__errno2resultx(int posixerrno, isc_boolean_t dolog,
++		   const char *file, int line);
+ 
+ ISC_LANG_ENDDECLS
+ 
+diff --git a/lib/isc/win32/libisc.def b/lib/isc/win32/libisc.def
+index 0c7a829..d7d2243 100644
+--- a/lib/isc/win32/libisc.def
++++ b/lib/isc/win32/libisc.def
+@@ -183,6 +183,7 @@ isc_buffer_reinit
+ isc_bufferlist_availablecount
+ isc_bufferlist_usedcount
+ isc_commandline_parse
++isc_commandline_strtoargv
+ isc_condition_broadcast
+ isc_condition_destroy
+ isc_condition_init
+@@ -258,6 +259,7 @@ isc_hash_ctxdetach
+ isc_hash_ctxinit
+ isc_hash_destroy
+ isc_hash_init
++isc_hashctx
+ isc_heap_create
+ isc_heap_decreased
+ isc_heap_delete
+diff --git a/lib/isc/win32/libisc.dsp b/lib/isc/win32/libisc.dsp
+index 0f14a89..156e23b 100644
+--- a/lib/isc/win32/libisc.dsp
++++ b/lib/isc/win32/libisc.dsp
+@@ -115,6 +115,10 @@ SOURCE=.\entropy.c
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=.\errno.c
++# End Source File
++# Begin Source File
++
+ SOURCE=.\errno2result.c
+ # End Source File
+ # Begin Source File
+@@ -267,6 +271,10 @@ SOURCE=..\include\isc\entropy.h
+ # End Source File
+ # Begin Source File
+ 
++SOURCE=..\include\isc\errno.h
++# End Source File
++# Begin Source File
++
+ SOURCE=.\errno2result.h
+ # End Source File
+ # Begin Source File
+diff --git a/lib/isc/win32/libisc.mak b/lib/isc/win32/libisc.mak
+index 96e44e4..5923693 100644
+--- a/lib/isc/win32/libisc.mak
++++ b/lib/isc/win32/libisc.mak
+@@ -128,6 +128,7 @@ CLEAN :
+ 	-@erase "$(INTDIR)\dir.obj"
+ 	-@erase "$(INTDIR)\DLLMain.obj"
+ 	-@erase "$(INTDIR)\entropy.obj"
++	-@erase "$(INTDIR)\errno.obj"
+ 	-@erase "$(INTDIR)\errno2result.obj"
+ 	-@erase "$(INTDIR)\error.obj"
+ 	-@erase "$(INTDIR)\event.obj"
+@@ -219,6 +220,7 @@ LINK32_OBJS= \
+ 	"$(INTDIR)\dir.obj" \
+ 	"$(INTDIR)\DLLMain.obj" \
+ 	"$(INTDIR)\entropy.obj" \
++	"$(INTDIR)\errno.obj" \
+ 	"$(INTDIR)\errno2result.obj" \
+ 	"$(INTDIR)\file.obj" \
+ 	"$(INTDIR)\fsaccess.obj" \
+@@ -341,6 +343,8 @@ CLEAN :
+ 	-@erase "$(INTDIR)\DLLMain.sbr"
+ 	-@erase "$(INTDIR)\entropy.obj"
+ 	-@erase "$(INTDIR)\entropy.sbr"
++	-@erase "$(INTDIR)\errno.obj"
++	-@erase "$(INTDIR)\errno.sbr"
+ 	-@erase "$(INTDIR)\errno2result.obj"
+ 	-@erase "$(INTDIR)\errno2result.sbr"
+ 	-@erase "$(INTDIR)\error.obj"
+@@ -497,6 +501,7 @@ BSC32_SBRS= \
+ 	"$(INTDIR)\dir.sbr" \
+ 	"$(INTDIR)\DLLMain.sbr" \
+ 	"$(INTDIR)\entropy.sbr" \
++	"$(INTDIR)\errno.sbr" \
+ 	"$(INTDIR)\errno2result.sbr" \
+ 	"$(INTDIR)\file.sbr" \
+ 	"$(INTDIR)\fsaccess.sbr" \
+@@ -588,6 +593,7 @@ LINK32_OBJS= \
+ 	"$(INTDIR)\dir.obj" \
+ 	"$(INTDIR)\DLLMain.obj" \
+ 	"$(INTDIR)\entropy.obj" \
++	"$(INTDIR)\errno.obj" \
+ 	"$(INTDIR)\errno2result.obj" \
+ 	"$(INTDIR)\file.obj" \
+ 	"$(INTDIR)\fsaccess.obj" \
+@@ -793,6 +799,23 @@ SOURCE=.\entropy.c
+ 
+ !ENDIF 
+ 
++SOURCE=.\errno.c
++
++!IF  "$(CFG)" == "libisc - @PLATFORM@ Release"
++
++
++"$(INTDIR)\errno.obj" : $(SOURCE) "$(INTDIR)"
++
++
++!ELSEIF  "$(CFG)" == "libisc - @PLATFORM@ Debug"
++
++
++"$(INTDIR)\errno.obj"	"$(INTDIR)\errno.sbr" : $(SOURCE) "$(INTDIR)"
++
++
++!ENDIF
++
++
+ SOURCE=.\errno2result.c
+ 
+ !IF  "$(CFG)" == "libisc - Win32 Release"
+diff --git a/lib/isc/win32/socket.c b/lib/isc/win32/socket.c
+index f015974..5455dbf 100644
+--- a/lib/isc/win32/socket.c
++++ b/lib/isc/win32/socket.c
+@@ -2480,7 +2480,7 @@ SocketIoThread(LPVOID ThreadContext) {
+ 			 * Did the I/O operation complete?
+ 			 */
+ 			errstatus = GetLastError();
+-			isc_result = isc__errno2resultx(errstatus, __FILE__, __LINE__);
++			isc_result = isc__errno2result(errstatus);
+ 
+ 			LOCK(&sock->lock);
+ 			CONSISTENT(sock);
+@@ -2532,7 +2532,7 @@ SocketIoThread(LPVOID ThreadContext) {
+ 						goto wait_again;
+ 					} else {
+ 						errstatus = GetLastError();
+-						isc_result = isc__errno2resultx(errstatus, __FILE__, __LINE__);
++						isc_result = isc__errno2result(errstatus);
+ 						socket_log(__LINE__, sock, NULL, EVENT, NULL, 0, 0,
+ 							"restart_accept() failed: errstatus=%d isc_result=%d",
+ 							errstatus, isc_result);
+diff --git a/lib/isccfg/include/isccfg/grammar.h b/lib/isccfg/include/isccfg/grammar.h
+index 2d7080c..7df760a 100644
+--- a/lib/isccfg/include/isccfg/grammar.h
++++ b/lib/isccfg/include/isccfg/grammar.h
+@@ -266,6 +266,7 @@ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_uint64;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_qstring;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_astring;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_ustring;
++LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_bracketed_text;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sockaddr;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_netaddr;
+ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_netaddr4;
+diff --git a/lib/isccfg/namedconf.c b/lib/isccfg/namedconf.c
+index 1527575..62fcc96 100644
+--- a/lib/isccfg/namedconf.c
++++ b/lib/isccfg/namedconf.c
+@@ -126,6 +126,7 @@ static cfg_type_t cfg_type_zoneopts;
+ static cfg_type_t cfg_type_dynamically_loadable_zones;
+ static cfg_type_t cfg_type_dynamically_loadable_zones_opts;
+ static cfg_type_t cfg_type_v4_aaaa;
++static cfg_type_t cfg_type_dyndb;
+ 
+ /*
+  * Clauses that can be found in a 'dynamically loadable zones' statement
+@@ -897,6 +898,7 @@ namedconf_or_view_clauses[] = {
+ 	{ "zone", &cfg_type_zone, CFG_CLAUSEFLAG_MULTI },
+ 	/* only 1 DLZ per view allowed */
+ 	{ "dlz", &cfg_type_dynamically_loadable_zones, 0 },
++	{ "dyndb", &cfg_type_dyndb, CFG_CLAUSEFLAG_MULTI },
+ 	{ "server", &cfg_type_server, CFG_CLAUSEFLAG_MULTI },
+ 	{ "trusted-keys", &cfg_type_dnsseckeys, CFG_CLAUSEFLAG_MULTI },
+ 	{ "managed-keys", &cfg_type_managedkeys, CFG_CLAUSEFLAG_MULTI },
+@@ -1706,6 +1708,22 @@ static cfg_type_t cfg_type_dynamically_loadable_zones_opts = {
+ };
+ 
+ /*%
++ * The "dyndb" statement syntax.
++ */
++
++static cfg_tuplefielddef_t dyndb_fields[] = {
++	{ "name", &cfg_type_astring, 0 },
++	{ "library", &cfg_type_qstring, 0 },
++	{ "parameters", &cfg_type_bracketed_text, 0 },
++	{ NULL, NULL, 0 }
++};
++
++static cfg_type_t cfg_type_dyndb = {
++	"dyndb", cfg_parse_tuple, cfg_print_tuple, cfg_doc_tuple,
++	 &cfg_rep_tuple, dyndb_fields
++};
++
++/*%
+  * Clauses that can be found within the 'key' statement.
+  */
+ static cfg_clausedef_t
+diff --git a/lib/isccfg/parser.c b/lib/isccfg/parser.c
+index de0fa31..5dc1653 100644
+--- a/lib/isccfg/parser.c
++++ b/lib/isccfg/parser.c
+@@ -762,6 +762,42 @@ cfg_parse_astring(cfg_parser_t *pctx, const cfg_type_t *type,
+ 	return (result);
+ }
+ 
++static isc_result_t
++parse_btext(cfg_parser_t *pctx, const cfg_type_t *type,
++	    cfg_obj_t **ret)
++{
++	isc_result_t result;
++	UNUSED(type);
++
++	CHECK(cfg_gettoken(pctx, ISC_LEXOPT_BTEXT));
++	if (pctx->token.type != isc_tokentype_btext) {
++		cfg_parser_error(pctx, CFG_LOG_NEAR,
++				 "expected bracketed text");
++		return (ISC_R_UNEXPECTEDTOKEN);
++	}
++	return (create_string(pctx,
++			      TOKEN_STRING(pctx),
++			      &cfg_type_bracketed_text,
++			      ret));
++ cleanup:
++	return (result);
++}
++
++static void
++print_btext(cfg_printer_t *pctx, const cfg_obj_t *obj) {
++	cfg_print_cstr(pctx, "{");
++	cfg_print_chars(pctx, obj->value.string.base, obj->value.string.length);
++	print_close(pctx);
++}
++
++static void
++doc_btext(cfg_printer_t *pctx, const cfg_type_t *type) {
++	UNUSED(type);
++
++	cfg_print_cstr(pctx, "{ <unspecified text> }");
++}
++
++
+ isc_boolean_t
+ cfg_is_enum(const char *s, const char *const *enums) {
+ 	const char * const *p;
+@@ -855,6 +891,16 @@ cfg_type_t cfg_type_astring = {
+ };
+ 
+ /*
++ * Text enclosed in brackets. Used to pass a block of configuration
++ * text to dynamic library or external application. Checked for
++ * bracket balance, but not otherwise parsed.
++ */
++cfg_type_t cfg_type_bracketed_text = {
++	"bracketed_text", parse_btext, print_btext, doc_btext,
++	&cfg_rep_string, NULL
++};
++
++/*
+  * Booleans
+  */
+ 
+-- 
+2.9.3
+

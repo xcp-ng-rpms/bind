@@ -1,0 +1,178 @@
+diff --git a/bin/check/named-checkzone.8 b/bin/check/named-checkzone.8
+index 8538ca8..0ab0049 100644
+--- a/bin/check/named-checkzone.8
++++ b/bin/check/named-checkzone.8
+@@ -251,7 +251,7 @@ so that include directives in the configuration file are processed as if run by
+ .PP
+ \-T \fImode\fR
+ .RS 4
+-Check if Sender Policy Framework records (TXT and SPF) both exist or both don't exist. A warning is issued if they don't match. Possible modes are
++Check if Sender Policy Framework (SPF) records exist and issues a warning if an SPF-formatted TXT record is not also present. Possible modes are
+ \fB"warn"\fR
+ (default),
+ \fB"ignore"\fR.
+diff --git a/bin/check/named-checkzone.docbook b/bin/check/named-checkzone.docbook
+index ea37fa2..e78d574 100644
+--- a/bin/check/named-checkzone.docbook
++++ b/bin/check/named-checkzone.docbook
+@@ -408,10 +408,10 @@
+ 	<term>-T <replaceable class="parameter">mode</replaceable></term>
+ 	<listitem>
+ 	  <para>
+-	    Check if Sender Policy Framework records (TXT and SPF)
+-	    both exist or both don't exist.  A warning is issued
+-	    if they don't match.  Possible modes are
+-	    <command>"warn"</command> (default), <command>"ignore"</command>.
++	    Check if Sender Policy Framework (SPF) records exist
++	    and issues a warning if an SPF-formatted TXT record is
++	    not also present.  Possible modes are <command>"warn"</command>
++	    (default), <command>"ignore"</command>.
+ 	  </para>
+ 	</listitem>
+       </varlistentry>
+diff --git a/bin/tests/system/checkzone/tests.sh b/bin/tests/system/checkzone/tests.sh
+index 2353c14..7d9192e 100644
+--- a/bin/tests/system/checkzone/tests.sh
++++ b/bin/tests/system/checkzone/tests.sh
+@@ -44,12 +44,12 @@ echo "I:checking with spf warnings ($n)"
+ ret=0
+ $CHECKZONE example zones/spf.db > test.out1.$n 2>&1 || ret=1
+ $CHECKZONE -T ignore example zones/spf.db > test.out2.$n 2>&1 || ret=1
+-grep "'x.example' found SPF/TXT" test.out1.$n > /dev/null || ret=1
+-grep "'y.example' found SPF/SPF" test.out1.$n > /dev/null || ret=1
+-grep "'example' found SPF/" test.out1.$n > /dev/null && ret=1
+-grep "'x.example' found SPF/" test.out2.$n > /dev/null && ret=1
+-grep "'y.example' found SPF/" test.out2.$n > /dev/null && ret=1
+-grep "'example' found SPF/" test.out2.$n > /dev/null && ret=1
++grep "'x.example' found type SPF" test.out1.$n > /dev/null && ret=1
++grep "'y.example' found type SPF" test.out1.$n > /dev/null || ret=1
++grep "'example' found type SPF" test.out1.$n > /dev/null && ret=1
++grep "'x.example' found type SPF" test.out2.$n > /dev/null && ret=1
++grep "'y.example' found type SPF" test.out2.$n > /dev/null && ret=1
++grep "'example' found type SPF" test.out2.$n > /dev/null && ret=1
+ n=`expr $n + 1`
+ if [ $ret != 0 ]; then echo "I:failed"; fi
+ status=`expr $status + $ret`
+diff --git a/bin/tests/system/spf/tests.sh b/bin/tests/system/spf/tests.sh
+index 6acd283..3da6e2e 100644
+--- a/bin/tests/system/spf/tests.sh
++++ b/bin/tests/system/spf/tests.sh
+@@ -24,19 +24,16 @@ echo "I:checking that SPF warnings have been correctly generated ($n)"
+ ret=0
+ 
+ grep "zone spf/IN: loaded serial 0" ns1/named.run > /dev/null || ret=1
+-grep "'x.spf' found SPF/TXT" ns1/named.run > /dev/null || ret=1
+-grep "'y.spf' found SPF/SPF" ns1/named.run > /dev/null || ret=1
+-grep "'spf' found SPF/" ns1/named.run > /dev/null && ret=1
++grep "'y.spf' found type SPF" ns1/named.run > /dev/null || ret=1
++grep "'spf' found type SPF" ns1/named.run > /dev/null && ret=1
+ 
+ grep "zone warn/IN: loaded serial 0" ns1/named.run > /dev/null || ret=1
+-grep "'x.warn' found SPF/TXT" ns1/named.run > /dev/null || ret=1
+-grep "'y.warn' found SPF/SPF" ns1/named.run > /dev/null || ret=1
+-grep "'warn' found SPF/" ns1/named.run > /dev/null && ret=1
++grep "'y.warn' found type SPF" ns1/named.run > /dev/null || ret=1
++grep "'warn' found type SPF" ns1/named.run > /dev/null && ret=1
+ 
+ grep "zone nowarn/IN: loaded serial 0" ns1/named.run > /dev/null || ret=1
+-grep "'x.nowarn' found SPF/" ns1/named.run > /dev/null && ret=1
+-grep "'y.nowarn' found SPF/" ns1/named.run > /dev/null && ret=1
+-grep "'nowarn' found SPF/" ns1/named.run > /dev/null && ret=1
++grep "'y.nowarn' found type SPF" ns1/named.run > /dev/null && ret=1
++grep "'nowarn' found type SPF" ns1/named.run > /dev/null && ret=1
+ n=`expr $n + 1`
+ if [ $ret != 0 ]; then echo "I:failed"; fi
+ status=`expr $status + $ret`
+diff --git a/doc/arm/Bv9ARM-book.xml b/doc/arm/Bv9ARM-book.xml
+index 96c9faf..bd42e11 100644
+--- a/doc/arm/Bv9ARM-book.xml
++++ b/doc/arm/Bv9ARM-book.xml
+@@ -4750,7 +4750,7 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+     <optional> check-mx-cname ( <replaceable>warn</replaceable> | <replaceable>fail</replaceable> | <replaceable>ignore</replaceable> ); </optional>
+     <optional> check-srv-cname ( <replaceable>warn</replaceable> | <replaceable>fail</replaceable> | <replaceable>ignore</replaceable> ); </optional>
+     <optional> check-sibling <replaceable>yes_or_no</replaceable>; </optional>
+-    <optional> check-spf ( <replaceable>warn</replaceable> | <replaceable>fail</replaceable> | <replaceable>ignore</replaceable> ); </optional>
++    <optional> check-spf ( <replaceable>warn</replaceable> | <replaceable>ignore</replaceable> ); </optional>
+     <optional> allow-new-zones { <replaceable>yes_or_no</replaceable> }; </optional>
+     <optional> allow-notify { <replaceable>address_match_list</replaceable> }; </optional>
+     <optional> allow-query { <replaceable>address_match_list</replaceable> }; </optional>
+@@ -6573,10 +6573,13 @@ options {
+ 	          The default is <command>yes</command>.
+ 		</para>
+ 		<para>
+-		  Check that the two forms of Sender Policy Framework
+-		  records (TXT records starting with "v=spf1" and SPF) either
+-		  both exist or both don't exist.  Warnings are
+-		  emitted it they don't and be suppressed with
++		  The use of the SPF record for publishing Sender
++		  Policy Framework is deprecated as the migration
++		  from using TXT records to SPF records was abandoned.
++		  Enabling this option also checks that a TXT Sender
++		  Policy Framework record exists (starts with "v=spf1")
++		  if there is an SPF record. Warnings are emitted if the
++		  TXT record does not exist and can be suppressed with
+ 		  <command>check-spf</command>.
+ 		</para>
+ 	      </listitem>
+@@ -6618,11 +6621,11 @@ options {
+ 	      <term><command>check-spf</command></term>
+ 	      <listitem>
+ 		<para>
+-		  When performing integrity checks, check that the
+-		  two forms of Sender Policy Framwork records (TXT
+-		  records starting with "v=spf1" and SPF) both exist
+-		  or both don't exist and issue a warning if not
+-		  met.  The default is <command>warn</command>.
++		  If <command>check-integrity</command> is set then
++		  check that there is a TXT Sender Policy Framework
++		  record present (starts with "v=spf1") if there is an
++		  SPF record present. The default is
++		  <command>warn</command>.
+ 		</para>
+ 	      </listitem>
+ 	    </varlistentry>
+@@ -10372,7 +10375,7 @@ view "external" {
+     <optional> check-names (<constant>warn</constant>|<constant>fail</constant>|<constant>ignore</constant>) ; </optional>
+     <optional> check-mx (<constant>warn</constant>|<constant>fail</constant>|<constant>ignore</constant>) ; </optional>
+     <optional> check-wildcard <replaceable>yes_or_no</replaceable>; </optional>
+-    <optional> check-spf ( <replaceable>warn</replaceable> | <replaceable>fail</replaceable> | <replaceable>ignore</replaceable> ); </optional>
++    <optional> check-spf ( <replaceable>warn</replaceable> | <replaceable>ignore</replaceable> ); </optional>
+     <optional> check-integrity <replaceable>yes_or_no</replaceable> ; </optional>
+     <optional> dialup <replaceable>dialup_option</replaceable> ; </optional>
+     <optional> file <replaceable>string</replaceable> ; </optional>
+diff --git a/lib/dns/zone.c b/lib/dns/zone.c
+index 86fad98..08c6d10 100644
+--- a/lib/dns/zone.c
++++ b/lib/dns/zone.c
+@@ -2612,8 +2612,8 @@ integrity_checks(dns_zone_t *zone, dns_db_t *db) {
+ 
+  checkspf:
+ 		/*
+-		 * Check if there is a type TXT spf record without a type SPF
+-		 * RRset being present.
++		 * Check if there is a type SPF record without an
++		 * SPF-formatted type TXT record also being present.
+ 		 */
+ 		if (!DNS_ZONE_OPTION(zone, DNS_ZONEOPT_CHECKSPF))
+ 			goto next;
+@@ -2642,16 +2642,13 @@ integrity_checks(dns_zone_t *zone, dns_db_t *db) {
+ 		dns_rdataset_disassociate(&rdataset);
+ 
+  notxt:
+-		if (have_spf != have_txt) {
++		if (have_spf && !have_txt) {
+ 			char namebuf[DNS_NAME_FORMATSIZE];
+-			const char *found = have_txt ? "TXT" : "SPF";
+-			const char *need = have_txt ? "SPF" : "TXT";
+ 
+ 			dns_name_format(name, namebuf, sizeof(namebuf));
+-			dns_zone_log(zone, ISC_LOG_WARNING, "'%s' found SPF/%s "
+-				     "record but no SPF/%s record found, add "
+-				     "matching type %s record", namebuf, found,
+-				     need, need);
++			dns_zone_log(zone, ISC_LOG_WARNING, "'%s' found type "
++				     "SPF record but no SPF TXT record found, "
++				     "add matching type TXT record", namebuf);
+ 		}
+ 
+  next:

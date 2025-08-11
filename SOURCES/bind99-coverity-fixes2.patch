@@ -1,0 +1,44 @@
+From 1f3ac11cb4ecfab52f517ebf78493b0f05318be2 Mon Sep 17 00:00:00 2001
+From: Evan Hunt <each@isc.org>
+Date: Mon, 16 Jun 2014 15:31:04 -0700
+Subject: [PATCH] [v9_9] null terminate strings for coverity
+
+---
+ bin/dig/dig.c                         | 1 +
+ bin/tests/system/dlzexternal/driver.c | 6 ++++++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/bin/dig/dig.c b/bin/dig/dig.c
+index 8a5fead..6af0964 100644
+--- a/bin/dig/dig.c
++++ b/bin/dig/dig.c
+@@ -1453,6 +1453,7 @@ dash_option(char *option, char *next, dig_lookup_t **lookup,
+ 				ip6_int, ISC_FALSE) == ISC_R_SUCCESS) {
+ 			strncpy((*lookup)->textname, textname,
+ 				sizeof((*lookup)->textname));
++			(*lookup)->textname[sizeof((*lookup)->textname)-1] = 0;
+ 			debug("looking up %s", (*lookup)->textname);
+ 			(*lookup)->trace_root = ISC_TF((*lookup)->trace  ||
+ 						(*lookup)->ns_search_only);
+diff --git a/bin/tests/system/dlzexternal/driver.c b/bin/tests/system/dlzexternal/driver.c
+index 053c25a..f99ac14 100644
+--- a/bin/tests/system/dlzexternal/driver.c
++++ b/bin/tests/system/dlzexternal/driver.c
+@@ -133,8 +133,14 @@ add_name(struct dlz_example_data *state, struct record *list,
+ 		return (ISC_R_NOSPACE);
+ 
+ 	strncpy(list[i].name, name, sizeof(list[i].name));
++	list[i].name[sizeof(list[i].name) - 1] = '\0';
++
+ 	strncpy(list[i].type, type, sizeof(list[i].type));
++	list[i].type[sizeof(list[i].type) - 1] = '\0';
++
+ 	strncpy(list[i].data, data, sizeof(list[i].data));
++	list[i].data[sizeof(list[i].data) - 1] = '\0';
++
+ 	list[i].ttl = ttl;
+ 
+ 	return (ISC_R_SUCCESS);
+-- 
+2.9.3
+

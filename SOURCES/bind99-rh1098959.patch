@@ -1,0 +1,164 @@
+diff -up bind-9.8.2rc1/bin/named/include/named/lwresd.h.lwres_tasks_clients bind-9.8.2rc1/bin/named/include/named/lwresd.h
+--- bind-9.8.2rc1/bin/named/include/named/lwresd.h.lwres_tasks_clients	2007-06-20 01:46:59.000000000 +0200
++++ bind-9.8.2rc1/bin/named/include/named/lwresd.h	2014-05-19 09:41:56.792427201 +0200
+@@ -36,6 +36,8 @@ struct ns_lwresd {
+ 	dns_view_t *view;
+ 	ns_lwsearchlist_t *search;
+ 	unsigned int ndots;
++	unsigned int ntasks;
++	unsigned int nclients;
+ 	isc_mem_t *mctx;
+ 	isc_boolean_t shutting_down;
+ 	unsigned int refs;
+diff -up bind-9.8.2rc1/bin/named/lwresd.c.lwres_tasks_clients bind-9.8.2rc1/bin/named/lwresd.c
+--- bind-9.8.2rc1/bin/named/lwresd.c.lwres_tasks_clients	2009-09-03 01:48:01.000000000 +0200
++++ bind-9.8.2rc1/bin/named/lwresd.c	2014-05-19 09:41:56.793427201 +0200
+@@ -60,11 +60,7 @@
+ #define LWRESLISTENER_MAGIC	ISC_MAGIC('L', 'W', 'R', 'L')
+ #define VALID_LWRESLISTENER(l)	ISC_MAGIC_VALID(l, LWRESLISTENER_MAGIC)
+ 
+-/*!
+- * The total number of clients we can handle will be NTASKS * NRECVS.
+- */
+-#define NTASKS		2	/*%< tasks to create to handle lwres queries */
+-#define NRECVS		2	/*%< max clients per task */
++#define LWRESD_NCLIENTS_MAX		32768	/*%< max clients per task */
+ 
+ typedef ISC_LIST(ns_lwreslistener_t) ns_lwreslistenerlist_t;
+ 
+@@ -395,6 +391,24 @@ ns_lwdmanager_create(isc_mem_t *mctx, co
+ 		}
+ 	}
+ 
++	obj = NULL;
++	(void)cfg_map_get(lwres, "lwres-tasks", &obj);
++	if (obj != NULL)
++		lwresd->ntasks = cfg_obj_asuint32(obj);
++	else
++		lwresd->ntasks = ns_g_cpus;
++
++	obj = NULL;
++	(void)cfg_map_get(lwres, "lwres-clients", &obj);
++	if (obj != NULL) {
++		lwresd->nclients = cfg_obj_asuint32(obj);
++		if (lwresd->nclients > LWRESD_NCLIENTS_MAX)
++			lwresd->nclients = LWRESD_NCLIENTS_MAX;
++	} else if (ns_g_lwresdonly)
++		lwresd->nclients = 1024;
++	else
++		lwresd->nclients = 256;
++
+ 	lwresd->magic = LWRESD_MAGIC;
+ 
+ 	*lwresdp = lwresd;
+@@ -604,15 +618,24 @@ static isc_result_t
+ listener_startclients(ns_lwreslistener_t *listener) {
+ 	ns_lwdclientmgr_t *cm;
+ 	unsigned int i;
+-	isc_result_t result;
++	isc_result_t result = ISC_R_SUCCESS;
++
++	isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++		      NS_LOGMODULE_LWRESD, ISC_LOG_DEBUG(6),
++		      "listener_startclients: creating %d "
++		      "managers with %d clients each",
++		      listener->manager->ntasks, listener->manager->nclients);
+ 
+ 	/*
+ 	 * Create the client managers.
+ 	 */
+-	result = ISC_R_SUCCESS;
+-	for (i = 0; i < NTASKS && result == ISC_R_SUCCESS; i++)
+-		result = ns_lwdclientmgr_create(listener, NRECVS,
++	for (i = 0; i < listener->manager->ntasks; i++) {
++		result = ns_lwdclientmgr_create(listener,
++						listener->manager->nclients,
+ 						ns_g_taskmgr);
++		if (result != ISC_R_SUCCESS)
++			break;
++	}
+ 
+ 	/*
+ 	 * Ensure that we have created at least one.
+diff -up bind-9.8.2rc1/bin/named/named.conf.docbook.lwres_tasks_clients bind-9.8.2rc1/bin/named/named.conf.docbook
+--- bind-9.8.2rc1/bin/named/named.conf.docbook.lwres_tasks_clients	2011-11-07 01:31:47.000000000 +0100
++++ bind-9.8.2rc1/bin/named/named.conf.docbook	2014-05-19 09:41:56.793427201 +0200
+@@ -185,6 +185,8 @@ lwres {
+ 	view <replaceable>string</replaceable> <replaceable>optional_class</replaceable>;
+ 	search { <replaceable>string</replaceable>; ... };
+ 	ndots <replaceable>integer</replaceable>;
++	lwres-tasks <replaceable>integer</replaceable>;
++	lwres-clients <replaceable>integer</replaceable>;
+ };
+ </literallayout>
+   </refsect1>
+diff -up bind-9.8.2rc1/doc/arm/Bv9ARM-book.xml.lwres_tasks_clients bind-9.8.2rc1/doc/arm/Bv9ARM-book.xml
+--- bind-9.8.2rc1/doc/arm/Bv9ARM-book.xml.lwres_tasks_clients	2014-05-19 09:41:56.770427201 +0200
++++ bind-9.8.2rc1/doc/arm/Bv9ARM-book.xml	2014-05-19 10:26:40.147380836 +0200
+@@ -2964,7 +2964,12 @@ $ORIGIN 0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.
+         be configured to act as a lightweight resolver daemon using the
+         <command>lwres</command> statement in <filename>named.conf</filename>.
+       </para>
+-
++      <para>
++        The number of client queries that the <command>lwresd</command>
++        daemon is able to serve can be set using the
++        <option>lwres-tasks</option> and <option>lwres-clients</option> 
++        statements in the configuration.
++      </para>
+     </sect1>
+   </chapter>
+ 
+@@ -4959,6 +4964,8 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+     <optional> view <replaceable>view_name</replaceable>; </optional>
+     <optional> search { <replaceable>domain_name</replaceable> ; <optional> <replaceable>domain_name</replaceable> ; ... </optional> }; </optional>
+     <optional> ndots <replaceable>number</replaceable>; </optional>
++    <optional> lwres-tasks <replaceable>number</replaceable>; </optional>
++    <optional> lwres-clients <replaceable>number</replaceable>; </optional>
+ };
+ </programlisting>
+ 
+@@ -5017,6 +5024,31 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+           number of dots in a relative domain name that should result in an
+           exact match lookup before search path elements are appended.
+         </para>
++        <para>
++          The <option>lwres-tasks</option> statement specifies the number
++          of worker threads the lightweight resolver will dedicate to serving
++          clients.  By default the number is the same as the number of CPUs on
++          the system; this can be overridden using the <option>-n</option>
++          command line option when starting the server. 
++        </para>
++        <para>
++          The <option>lwres-clients</option> specifies
++          the number of client objects per thread the lightweight
++          resolver should create to serve client queries.
++          By default, if the lightweight resolver runs as a part
++          of <command>named</command>, 256 client objects are
++          created for each task; if it runs as <command>lwresd</command>,
++          1024 client objects are created for each thread. The maximum
++          value is 32768; higher values will be silently ignored and
++          the maximum will be used instead.
++          Note that setting too high a value may overconsume
++          system resources.
++        </para>
++        <para>
++          The maximum number of client queries that the lightweight
++          resolver can handle at any one time equals
++          <option>lwres-tasks</option> times <option>lwres-clients</option>.
++        </para>
+       </sect2>
+       <sect2>
+         <title><command>masters</command> Statement Grammar</title>
+diff -up bind-9.8.2rc1/lib/isccfg/namedconf.c.lwres_tasks_clients bind-9.8.2rc1/lib/isccfg/namedconf.c
+--- bind-9.8.2rc1/lib/isccfg/namedconf.c.lwres_tasks_clients	2014-05-19 09:41:56.771427201 +0200
++++ bind-9.8.2rc1/lib/isccfg/namedconf.c	2014-05-19 09:41:56.797427201 +0200
+@@ -2563,6 +2563,8 @@ lwres_clauses[] = {
+ 	{ "view", &cfg_type_lwres_view, 0 },
+ 	{ "search", &cfg_type_lwres_searchlist, 0 },
+ 	{ "ndots", &cfg_type_uint32, 0 },
++	{ "lwres-tasks", &cfg_type_uint32, 0},
++	{ "lwres-clients", &cfg_type_uint32, 0},
+ 	{ NULL, NULL, 0 }
+ };
+ 

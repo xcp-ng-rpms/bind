@@ -1,0 +1,5539 @@
+From 34c87ea385ff013ca2f2058b884f53886065a4a3 Mon Sep 17 00:00:00 2001
+From: Tomas Hozza <thozza@redhat.com>
+Date: Wed, 13 Apr 2016 09:57:31 +0200
+Subject: [PATCH] Added support for GeoIP
+
+Signed-off-by: Tomas Hozza <thozza@redhat.com>
+---
+ bin/named/Makefile.in                         |   8 +-
+ bin/named/geoip.c                             | 148 +++++
+ bin/named/include/named/geoip.h               |  31 +
+ bin/named/include/named/globals.h             |   5 +
+ bin/named/interfacemgr.c                      |   3 +
+ bin/named/server.c                            |  38 +-
+ bin/tests/system/Makefile.in                  |   2 +-
+ bin/tests/system/conf.sh.in                   |   2 +-
+ bin/tests/system/geoip/Makefile.in            |  55 ++
+ bin/tests/system/geoip/clean.sh               |  23 +
+ bin/tests/system/geoip/data/GeoIP.csv         |   7 +
+ bin/tests/system/geoip/data/GeoIPASNum.csv    |   7 +
+ bin/tests/system/geoip/data/GeoIPASNumv6.csv  |   7 +
+ bin/tests/system/geoip/data/GeoIPCity.csv     |   7 +
+ bin/tests/system/geoip/data/GeoIPCityv6.csv   |   7 +
+ bin/tests/system/geoip/data/GeoIPDomain.csv   |   7 +
+ bin/tests/system/geoip/data/GeoIPISP.csv      |   7 +
+ bin/tests/system/geoip/data/GeoIPNetSpeed.csv |   7 +
+ bin/tests/system/geoip/data/GeoIPOrg.csv      |   7 +
+ bin/tests/system/geoip/data/GeoIPRegion.csv   |   7 +
+ bin/tests/system/geoip/data/GeoIPv6.csv       |   7 +
+ bin/tests/system/geoip/data/README            |  29 +
+ bin/tests/system/geoip/geoip.c                |  31 +
+ bin/tests/system/geoip/ns2/example.db.in      |  24 +
+ bin/tests/system/geoip/ns2/named1.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named10.conf       | 104 ++++
+ bin/tests/system/geoip/ns2/named11.conf       | 104 ++++
+ bin/tests/system/geoip/ns2/named12.conf       |  80 +++
+ bin/tests/system/geoip/ns2/named13.conf       |  45 ++
+ bin/tests/system/geoip/ns2/named14.conf       | 112 ++++
+ bin/tests/system/geoip/ns2/named15.conf       |  55 ++
+ bin/tests/system/geoip/ns2/named2.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named3.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named4.conf        |  96 +++
+ bin/tests/system/geoip/ns2/named5.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named6.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named7.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named8.conf        | 104 ++++
+ bin/tests/system/geoip/ns2/named9.conf        | 104 ++++
+ bin/tests/system/geoip/options.conf           |  42 ++
+ bin/tests/system/geoip/prereq.sh              |  23 +
+ bin/tests/system/geoip/setup.sh               |  27 +
+ bin/tests/system/geoip/tests.sh               | 328 +++++++++++
+ config.h.in                                   |   9 +
+ configure.in                                  |  94 +++
+ doc/arm/Bv9ARM-book.xml                       |  72 +++
+ lib/dns/Makefile.in                           |   8 +-
+ lib/dns/acl.c                                 |  23 +-
+ lib/dns/geoip.c                               | 820 ++++++++++++++++++++++++++
+ lib/dns/include/dns/Makefile.in               |   6 +-
+ lib/dns/include/dns/acl.h                     |  24 +-
+ lib/dns/include/dns/geoip.h                   | 119 ++++
+ lib/dns/tests/Makefile.in                     |   9 +-
+ lib/dns/tests/geoip_test.c                    | 694 ++++++++++++++++++++++
+ lib/export/dns/Makefile.in                    |   6 +-
+ lib/isccfg/aclconf.c                          | 361 +++++++++++-
+ lib/isccfg/include/isccfg/aclconf.h           |   6 +
+ lib/isccfg/namedconf.c                        | 129 +++-
+ 58 files changed, 4671 insertions(+), 33 deletions(-)
+ create mode 100644 bin/named/geoip.c
+ create mode 100644 bin/named/include/named/geoip.h
+ create mode 100644 bin/tests/system/geoip/Makefile.in
+ create mode 100644 bin/tests/system/geoip/clean.sh
+ create mode 100644 bin/tests/system/geoip/data/GeoIP.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPASNum.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPASNumv6.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPCity.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPCityv6.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPDomain.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPISP.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPNetSpeed.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPOrg.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPRegion.csv
+ create mode 100644 bin/tests/system/geoip/data/GeoIPv6.csv
+ create mode 100644 bin/tests/system/geoip/data/README
+ create mode 100644 bin/tests/system/geoip/geoip.c
+ create mode 100644 bin/tests/system/geoip/ns2/example.db.in
+ create mode 100644 bin/tests/system/geoip/ns2/named1.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named10.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named11.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named12.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named13.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named14.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named15.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named2.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named3.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named4.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named5.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named6.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named7.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named8.conf
+ create mode 100644 bin/tests/system/geoip/ns2/named9.conf
+ create mode 100644 bin/tests/system/geoip/options.conf
+ create mode 100644 bin/tests/system/geoip/prereq.sh
+ create mode 100644 bin/tests/system/geoip/setup.sh
+ create mode 100644 bin/tests/system/geoip/tests.sh
+ create mode 100644 lib/dns/geoip.c
+ create mode 100644 lib/dns/include/dns/geoip.h
+ create mode 100644 lib/dns/tests/geoip_test.c
+
+diff --git a/bin/named/Makefile.in b/bin/named/Makefile.in
+index 8ec9ad7..8b9e87a 100644
+--- a/bin/named/Makefile.in
++++ b/bin/named/Makefile.in
+@@ -83,8 +83,10 @@ SUBDIRS =	unix
+ 
+ TARGETS =	named@EXEEXT@ lwresd@EXEEXT@
+ 
++GEOIPLINKOBJS = geoip.@O@
++
+ OBJS =		builtin.@O@ client.@O@ config.@O@ control.@O@ \
+-		controlconf.@O@ interfacemgr.@O@ \
++		controlconf.@O@ @GEOIPLINKOBJS@ interfacemgr.@O@ \
+ 		listenlist.@O@ log.@O@ logconf.@O@ main.@O@ notify.@O@ \
+ 		query.@O@ server.@O@ sortlist.@O@ statschannel.@O@ \
+ 		tkeyconf.@O@ tsigconf.@O@ update.@O@ xfrout.@O@ \
+@@ -97,8 +99,10 @@ UOBJS =		unix/os.@O@ unix/dlz_dlopen_driver.@O@
+ 
+ SYMOBJS =	symtbl.@O@
+ 
++GEOIPLINKSRCS = geoip.c
++
+ SRCS =		builtin.c client.c config.c control.c \
+-		controlconf.c interfacemgr.c \
++		controlconf.c @GEOIPLINKSRCS@ interfacemgr.c \
+ 		listenlist.c log.c logconf.c main.c notify.c \
+ 		query.c server.c sortlist.c statschannel.c symtbl.c symtbl-empty.c \
+ 		tkeyconf.c tsigconf.c update.c xfrout.c \
+diff --git a/bin/named/geoip.c b/bin/named/geoip.c
+new file mode 100644
+index 0000000..c8f0c62
+--- /dev/null
++++ b/bin/named/geoip.c
+@@ -0,0 +1,148 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/*! \file */
++
++#include <config.h>
++
++#include <isc/util.h>
++
++#include <named/log.h>
++#include <named/geoip.h>
++
++#include <dns/geoip.h>
++
++#ifdef HAVE_GEOIP
++static dns_geoip_databases_t geoip_table = {
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
++};
++
++static void
++init_geoip_db(GeoIP **dbp, GeoIPDBTypes edition, GeoIPDBTypes fallback,
++	      GeoIPOptions method, const char *name)
++{
++	char *info;
++	GeoIP *db;
++
++	REQUIRE(dbp != NULL);
++
++	db = *dbp;
++
++	if (db != NULL) {
++		GeoIP_delete(db);
++		db = *dbp = NULL;
++	}
++
++	if (! GeoIP_db_avail(edition)) {
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++			NS_LOGMODULE_SERVER, ISC_LOG_INFO,
++			"GeoIP %s (type %d) DB not available", name, edition);
++		goto fail;
++	}
++
++	isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++		NS_LOGMODULE_SERVER, ISC_LOG_INFO,
++		"initializing GeoIP %s (type %d) DB", name, edition);
++
++	db = GeoIP_open_type(edition, method);
++	if (db == NULL) {
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++			NS_LOGMODULE_SERVER, ISC_LOG_ERROR,
++			"failed to initialize GeoIP %s (type %d) DB%s",
++			name, edition, fallback == 0
++			 ? "geoip matches using this database will fail" : "");
++		goto fail;
++	}
++
++	info = GeoIP_database_info(db);
++	if (info != NULL)
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++			      NS_LOGMODULE_SERVER, ISC_LOG_INFO,
++			      "%s", info);
++
++	*dbp = db;
++	return;
++ fail:
++	if (fallback != 0)
++		init_geoip_db(dbp, fallback, 0, method, name);
++
++}
++#endif /* HAVE_GEOIP */
++
++void
++ns_geoip_init(void) {
++#ifndef HAVE_GEOIP
++	return;
++#else
++	GeoIP_cleanup();
++	if (ns_g_geoip == NULL)
++		ns_g_geoip = &geoip_table;
++#endif
++}
++
++void
++ns_geoip_load(char *dir) {
++#ifndef HAVE_GEOIP
++
++	UNUSED(dir);
++
++	return;
++#else
++	GeoIPOptions method;
++
++#ifdef _WIN32
++	method = GEOIP_STANDARD;
++#else
++	method = GEOIP_MMAP_CACHE;
++#endif
++
++	ns_geoip_init();
++	if (dir != NULL) {
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++			      NS_LOGMODULE_SERVER, ISC_LOG_INFO,
++			      "using \"%s\" as GeoIP directory", dir);
++		GeoIP_setup_custom_directory(dir);
++	}
++
++	init_geoip_db(&ns_g_geoip->country_v4, GEOIP_COUNTRY_EDITION, 0,
++		      method, "Country (IPv4)");
++#ifdef HAVE_GEOIP_V6
++	init_geoip_db(&ns_g_geoip->country_v6, GEOIP_COUNTRY_EDITION_V6, 0,
++		      method, "Country (IPv6)");
++#endif
++
++	init_geoip_db(&ns_g_geoip->city_v4, GEOIP_CITY_EDITION_REV1,
++		      GEOIP_CITY_EDITION_REV0, method, "City (IPv4)");
++#if defined(HAVE_GEOIP_V6) && defined(HAVE_GEOIP_CITY_V6)
++	init_geoip_db(&ns_g_geoip->city_v6, GEOIP_CITY_EDITION_REV1_V6,
++		      GEOIP_CITY_EDITION_REV0_V6, method, "City (IPv6)");
++#endif
++
++	init_geoip_db(&ns_g_geoip->region, GEOIP_REGION_EDITION_REV1,
++		      GEOIP_REGION_EDITION_REV0, method, "Region");
++
++	init_geoip_db(&ns_g_geoip->isp, GEOIP_ISP_EDITION, 0,
++		      method, "ISP");
++	init_geoip_db(&ns_g_geoip->org, GEOIP_ORG_EDITION, 0,
++		      method, "Org");
++	init_geoip_db(&ns_g_geoip->as, GEOIP_ASNUM_EDITION, 0,
++		      method, "AS");
++	init_geoip_db(&ns_g_geoip->domain, GEOIP_DOMAIN_EDITION, 0,
++		      method, "Domain");
++	init_geoip_db(&ns_g_geoip->netspeed, GEOIP_NETSPEED_EDITION, 0,
++		      method, "NetSpeed");
++#endif /* HAVE_GEOIP */
++}
+diff --git a/bin/named/include/named/geoip.h b/bin/named/include/named/geoip.h
+new file mode 100644
+index 0000000..e1a66a7
+--- /dev/null
++++ b/bin/named/include/named/geoip.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2013  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++#ifndef _GEOIP_H
++#define _GEOIP_H
++
++#ifdef HAVE_GEOIP
++#include <GeoIP.h>
++#include <GeoIPCity.h>
++#endif /* HAVE_GEOIP */
++
++void ns_geoip_init(void);
++void ns_geoip_load(char *dir);
++
++#ifdef HAVE_GEOIP
++extern dns_geoip_databases_t *ns_g_geoip;
++#endif /* HAVE_GEOIP */
++#endif
+diff --git a/bin/named/include/named/globals.h b/bin/named/include/named/globals.h
+index aad462d..412b3a7 100644
+--- a/bin/named/include/named/globals.h
++++ b/bin/named/include/named/globals.h
+@@ -29,6 +29,7 @@
+ #include <isccfg/aclconf.h>
+ #include <isccfg/cfg.h>
+ 
++#include <dns/acl.h>
+ #include <dns/zone.h>
+ 
+ #include <dst/dst.h>
+@@ -160,6 +161,10 @@ EXTERN isc_boolean_t		ns_g_nosoa		INIT(ISC_FALSE);
+ EXTERN isc_boolean_t		ns_g_noaa		INIT(ISC_FALSE);
+ EXTERN isc_boolean_t		ns_g_nonearest		INIT(ISC_FALSE);
+ 
++#ifdef HAVE_GEOIP
++EXTERN dns_geoip_databases_t	*ns_g_geoip		INIT(NULL);
++#endif
++
+ #undef EXTERN
+ #undef INIT
+ 
+diff --git a/bin/named/interfacemgr.c b/bin/named/interfacemgr.c
+index 9206ebb..4f6b0f3 100644
+--- a/bin/named/interfacemgr.c
++++ b/bin/named/interfacemgr.c
+@@ -108,6 +108,9 @@ ns_interfacemgr_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
+ 	result = dns_aclenv_init(mctx, &mgr->aclenv);
+ 	if (result != ISC_R_SUCCESS)
+ 		goto cleanup_listenon;
++#ifdef HAVE_GEOIP
++	mgr->aclenv.geoip = ns_g_geoip;
++#endif
+ 
+ 	mgr->references = 1;
+ 	mgr->magic = IFMGR_MAGIC;
+diff --git a/bin/named/server.c b/bin/named/server.c
+index 6260f8f..e3ffc2e 100644
+--- a/bin/named/server.c
++++ b/bin/named/server.c
+@@ -99,6 +99,7 @@
+ #include <named/client.h>
+ #include <named/config.h>
+ #include <named/control.h>
++#include <named/geoip.h>
+ #include <named/interfacemgr.h>
+ #include <named/log.h>
+ #include <named/logconf.h>
+@@ -114,6 +115,9 @@
+ #include <named/ns_smf_globals.h>
+ #include <stdlib.h>
+ #endif
++#ifdef HAVE_GEOIP
++#include <named/geoip.h>
++#endif /* HAVE_GEOIP */
+ 
+ #ifndef PATH_MAX
+ #define PATH_MAX 1024
+@@ -3795,6 +3799,10 @@ create_view(const cfg_obj_t *vconfig, dns_viewlist_t *viewlist,
+ 	if (result != ISC_R_SUCCESS)
+ 		return (result);
+ 
++#ifdef HAVE_GEOIP
++	view->aclenv.geoip = ns_g_geoip;
++#endif
++
+ 	ISC_LIST_APPEND(*viewlist, view, link);
+ 	dns_view_attach(view, viewp);
+ 	return (ISC_R_SUCCESS);
+@@ -5122,6 +5130,24 @@ load_configuration(const char *filename, ns_server_t *server,
+ 	}
+ 	isc__socketmgr_setreserved(ns_g_socketmgr, reserved);
+ 
++#ifdef HAVE_GEOIP
++	/*
++	 * Initialize GeoIP databases from the configured location.
++	 * This should happen before configuring any ACLs, so that we
++	 * know what databases are available and can reject any GeoIP
++	 * ACLs that can't work.
++	 */
++	obj = NULL;
++	result = ns_config_get(maps, "geoip-directory", &obj);
++	if (result == ISC_R_SUCCESS && cfg_obj_isstring(obj)) {
++		char *dir;
++		DE_CONST(cfg_obj_asstring(obj), dir);
++		ns_geoip_load(dir);
++	} else
++		ns_geoip_load(NULL);
++	ns_g_aclconfctx->geoip = ns_g_geoip;
++#endif /* HAVE_GEOIP */
++
+ 	/*
+ 	 * Configure various server options.
+ 	 */
+@@ -6134,6 +6160,10 @@ shutdown_server(isc_task_t *task, isc_event_t *event) {
+ 	if (server->blackholeacl != NULL)
+ 		dns_acl_detach(&server->blackholeacl);
+ 
++#ifdef HAVE_GEOIP
++	dns_geoip_shutdown();
++#endif
++
+ 	dns_db_detach(&server->in_roothints);
+ 
+ 	isc_task_endexclusive(server->task);
+@@ -6155,7 +6185,6 @@ ns_server_create(isc_mem_t *mctx, ns_server_t **serverp) {
+ 	server->task = NULL;
+ 
+ 	/* Initialize configuration data with default values. */
+-
+ 	result = isc_quota_init(&server->xfroutquota, 10);
+ 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
+ 	result = isc_quota_init(&server->tcpquota, 10);
+@@ -6163,9 +6192,16 @@ ns_server_create(isc_mem_t *mctx, ns_server_t **serverp) {
+ 	result = isc_quota_init(&server->recursionquota, 100);
+ 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
+ 
++
+ 	result = dns_aclenv_init(mctx, &server->aclenv);
+ 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
+ 
++#ifdef HAVE_GEOIP
++	/* Initialize GeoIP before using ACL environment */
++	ns_geoip_init();
++	server->aclenv.geoip = ns_g_geoip;
++#endif
++
+ 	/* Initialize server data structures. */
+ 	server->zonemgr = NULL;
+ 	server->interfacemgr = NULL;
+diff --git a/bin/tests/system/Makefile.in b/bin/tests/system/Makefile.in
+index af8b82c..0c7fdff 100644
+--- a/bin/tests/system/Makefile.in
++++ b/bin/tests/system/Makefile.in
+@@ -21,7 +21,7 @@ top_srcdir =	@top_srcdir@
+ 
+ @BIND9_MAKE_INCLUDES@
+ 
+-SUBDIRS =	dlzexternal dyndb filter-aaaa lwresd rpz rrl \
++SUBDIRS =	dlzexternal dyndb filter-aaaa geoip lwresd rpz rrl \
+ 		rsabigexponent tkey tsiggss
+ TARGETS =
+ 
+diff --git a/bin/tests/system/conf.sh.in b/bin/tests/system/conf.sh.in
+index eb02236..6df4734 100644
+--- a/bin/tests/system/conf.sh.in
++++ b/bin/tests/system/conf.sh.in
+@@ -65,7 +65,7 @@ SUBDIRS="acl additional allow_query addzone autosign builtin
+          lwresd masterfile masterformat metadata notify nsupdate pending
+ 	 @PKCS11_TEST@ redirect resolver rndc rpz rrl rrsetorder rsabigexponent
+ 	 smartsign sortlist spf staticstub stub tkey tsig tsiggss unknown
+-	 upforwd verify views wildcard xfer xferquota zero zonechecks"
++	 upforwd verify views wildcard xfer xferquota zero zonechecks geoip filter-aaaa"
+ 
+ # PERL will be an empty string if no perl interpreter was found.
+ PERL=@PERL@
+diff --git a/bin/tests/system/geoip/Makefile.in b/bin/tests/system/geoip/Makefile.in
+new file mode 100644
+index 0000000..ab48003
+--- /dev/null
++++ b/bin/tests/system/geoip/Makefile.in
+@@ -0,0 +1,55 @@
++# Copyright (C) 2010-2012  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++# $Id: Makefile.in,v 1.4 2011/07/28 23:47:58 tbox Exp $
++
++srcdir =	@srcdir@
++VPATH =		@srcdir@
++top_srcdir =	@top_srcdir@
++
++@BIND9_VERSION@
++
++@BIND9_MAKE_INCLUDES@
++
++CINCLUDES =	${ISC_INCLUDES}
++
++CDEFINES =
++CWARNINGS =
++
++DNSLIBS =
++ISCLIBS =	.
++
++DNSDEPLIBS =
++ISCDEPLIBS =
++
++DEPLIBS =
++
++LIBS =		@LIBS@
++
++TARGETS =	geoip@EXEEXT@
++
++FILTEROBJS =	geoip.@O@
++
++SRCS =		geoip.c
++
++@BIND9_MAKE_RULES@
++
++all: geoip@EXEEXT@
++
++geoip@EXEEXT@: ${FILTEROBJS}
++	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${FILTEROBJS} ${LIBS}
++
++clean distclean::
++	rm -f ${TARGETS}
++
+diff --git a/bin/tests/system/geoip/clean.sh b/bin/tests/system/geoip/clean.sh
+new file mode 100644
+index 0000000..b04ca2d
+--- /dev/null
++++ b/bin/tests/system/geoip/clean.sh
+@@ -0,0 +1,23 @@
++#!/bin/sh
++#
++# Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++rm -f ns2/named.conf
++rm -f ns2/example*.db
++rm -f dig.out.* rndc.out.*
++rm -f data2/*dat
++[ -d data2 ] && rmdir data2
++rm -f ns?/named.run
++rm -f ns?/named.memstats
+diff --git a/bin/tests/system/geoip/data/GeoIP.csv b/bin/tests/system/geoip/data/GeoIP.csv
+new file mode 100644
+index 0000000..f158a5b
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIP.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 AU
++10.53.0.2/32 US
++10.53.0.3/32 GB
++10.53.0.4/32 CA
++10.53.0.5/32 CL
++10.53.0.6/32 DE
++10.53.0.7/32 EH
+diff --git a/bin/tests/system/geoip/data/GeoIPASNum.csv b/bin/tests/system/geoip/data/GeoIPASNum.csv
+new file mode 100644
+index 0000000..774edd1
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPASNum.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 AS100001 One Systems, Inc.
++10.53.0.2/32 AS100002 Two Technology Ltd.
++10.53.0.3/32 AS100003 Three Network Labs
++10.53.0.4/32 AS100004 Four University
++10.53.0.5/32 AS100005 Five Telecom
++10.53.0.6/32 AS100006 Six Company
++10.53.0.7/32 AS100007 Seven Communications
+diff --git a/bin/tests/system/geoip/data/GeoIPASNumv6.csv b/bin/tests/system/geoip/data/GeoIPASNumv6.csv
+new file mode 100644
+index 0000000..4074289
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPASNumv6.csv
+@@ -0,0 +1,7 @@
++fd92:7065:b8e:ffff::1/128,AS100001 One Systems, Inc.
++fd92:7065:b8e:ffff::2/128,AS100002 Two Technology Ltd.
++fd92:7065:b8e:ffff::3/128,AS100003 Three Network Labs
++fd92:7065:b8e:ffff::4/128,AS100004 Four University
++fd92:7065:b8e:ffff::5/128,AS100005 Five Telecom
++fd92:7065:b8e:ffff::6/128,AS100006 Six Company
++fd92:7065:b8e:ffff::7/128,AS100007 Seven Communications
+diff --git a/bin/tests/system/geoip/data/GeoIPCity.csv b/bin/tests/system/geoip/data/GeoIPCity.csv
+new file mode 100644
+index 0000000..14900d5
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPCity.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32,US,CA,"Redwood City",94063,37.4914,-122.2110,807,650
++10.53.0.2/32,US,CA,"Santa Cruz",95060,37.0448,-122.1021,828,831
++10.53.0.3/32,US,OK,"Oklahoma City",73120,35.5798,-97.5731,650,405
++10.53.0.4/32,US,VA,Ashland,23005,37.7563,-77.4888,556,804
++10.53.0.5/32,US,GA,Atlanta,30345,33.8477,-84.2814,524,404
++10.53.0.6/32,US,CO,Morrison,80465,39.6081,-105.2072,751,303
++10.53.0.7/32,US,AK,Ketchikan,99901,55.6153,-131.5848,747,907
+diff --git a/bin/tests/system/geoip/data/GeoIPCityv6.csv b/bin/tests/system/geoip/data/GeoIPCityv6.csv
+new file mode 100644
+index 0000000..5f09e62
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPCityv6.csv
+@@ -0,0 +1,7 @@
++"fd92:7065:b8e:ffff::1","fd92:7065:b8e:ffff::1","US","CA","Redwood City","94063",37.4914,-122.2110,807,650
++"fd92:7065:b8e:ffff::2","fd92:7065:b8e:ffff::2","US","CA","Santa Cruz","95060",37.0448,-122.1021,828,831
++"fd92:7065:b8e:ffff::3","fd92:7065:b8e:ffff::3","US","OK","Oklahoma City","73120",35.5798,-97.5731,650,405
++"fd92:7065:b8e:ffff::4","fd92:7065:b8e:ffff::4","DE","07","Lotte","",52.2833,7.9167,0,0
++"fd92:7065:b8e:ffff::5","fd92:7065:b8e:ffff::5","US","GA","Atlanta","30345",33.8477,-84.2814,524,404
++"fd92:7065:b8e:ffff::6","fd92:7065:b8e:ffff::6","US","CO","Morrison","80465",39.6081,-105.2072,751,303
++"fd92:7065:b8e:ffff::7","fd92:7065:b8e:ffff::7","US","AK","Ketchikan","99901",55.6153,-131.5848,747,907
+diff --git a/bin/tests/system/geoip/data/GeoIPDomain.csv b/bin/tests/system/geoip/data/GeoIPDomain.csv
+new file mode 100644
+index 0000000..8611d65
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPDomain.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 one.de
++10.53.0.2/32 two.com
++10.53.0.3/32 three.com
++10.53.0.4/32 four.com
++10.53.0.5/32 five.es
++10.53.0.6/32 six.it
++10.53.0.7/32 seven.org
+diff --git a/bin/tests/system/geoip/data/GeoIPISP.csv b/bin/tests/system/geoip/data/GeoIPISP.csv
+new file mode 100644
+index 0000000..3d5b4fa
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPISP.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 One Systems, Inc.
++10.53.0.2/32 Two Technology Ltd.
++10.53.0.3/32 Three Network Labs
++10.53.0.4/32 Four University
++10.53.0.5/32 Five Telecom
++10.53.0.6/32 Six Company
++10.53.0.7/32 Seven Communications
+diff --git a/bin/tests/system/geoip/data/GeoIPNetSpeed.csv b/bin/tests/system/geoip/data/GeoIPNetSpeed.csv
+new file mode 100644
+index 0000000..4ede137
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPNetSpeed.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 0
++10.53.0.2/32 1
++10.53.0.3/32 2
++10.53.0.4/32 3
++10.53.0.5/32 0
++10.53.0.6/32 1
++10.53.0.7/32 2
+diff --git a/bin/tests/system/geoip/data/GeoIPOrg.csv b/bin/tests/system/geoip/data/GeoIPOrg.csv
+new file mode 100644
+index 0000000..3d5b4fa
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPOrg.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 One Systems, Inc.
++10.53.0.2/32 Two Technology Ltd.
++10.53.0.3/32 Three Network Labs
++10.53.0.4/32 Four University
++10.53.0.5/32 Five Telecom
++10.53.0.6/32 Six Company
++10.53.0.7/32 Seven Communications
+diff --git a/bin/tests/system/geoip/data/GeoIPRegion.csv b/bin/tests/system/geoip/data/GeoIPRegion.csv
+new file mode 100644
+index 0000000..0bcd872
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPRegion.csv
+@@ -0,0 +1,7 @@
++10.53.0.1/32 US CA
++10.53.0.2/32 CA BC
++10.53.0.3/32 US OK
++10.53.0.4/32 AU
++10.53.0.5/32 US CO
++10.53.0.6/32 CA ON
++10.53.0.7/32 NL
+diff --git a/bin/tests/system/geoip/data/GeoIPv6.csv b/bin/tests/system/geoip/data/GeoIPv6.csv
+new file mode 100644
+index 0000000..919bf86
+--- /dev/null
++++ b/bin/tests/system/geoip/data/GeoIPv6.csv
+@@ -0,0 +1,7 @@
++"fd92:7065:b8e:ffff::1/128",AU
++"fd92:7065:b8e:ffff::2/128",US
++"fd92:7065:b8e:ffff::3/128",GB
++"fd92:7065:b8e:ffff::4/128",CA
++"fd92:7065:b8e:ffff::5/128",CL
++"fd92:7065:b8e:ffff::6/128",DE
++"fd92:7065:b8e:ffff::7/128",EH
+diff --git a/bin/tests/system/geoip/data/README b/bin/tests/system/geoip/data/README
+new file mode 100644
+index 0000000..0711cde
+--- /dev/null
++++ b/bin/tests/system/geoip/data/README
+@@ -0,0 +1,29 @@
++The data data files in this directory are sample GeoIP databases,
++generated from the corresponding CSV files.  Thanks to MaxMind, Inc.
++for assistance with producing these files.
++
++Unless otherwise noted, the databases only support IPv4:
++
++GeoIP.dat: Country (IPv4)
++GeoIPv6.dat: Country (IPv6)
++GeoIPCity.dat: City (IPv4)
++GeoIPCityv6.dat: City (IPv6)
++GeoIPRegion.dat: Region
++GeoIPISP.dat: ISP
++GeoIPOrg.dat: Organization
++GeoIPDoain.dat: Domain Name
++GeoIPASNum.dat: AS Number
++GeoIPNetSpeed.dat: Net Speed
++
++GeoIP.dat can also be generated using the open source 'geoip-csv-to-dat'
++utility:
++
++$ geoip-csv-to-dat -i "BIND9 geoip test data v1" -o GeoIP.dat << EOF
++"10.53.0.1","10.53.0.1","171245569","171245569","AU","Australia"
++"10.53.0.2","10.53.0.2","171245570","171245570","US","United States"
++"10.53.0.3","10.53.0.3","171245571","171245571","GB","United Kingdom"
++"10.53.0.4","10.53.0.4","171245572","171245572","CA","Canada"
++"10.53.0.5","10.53.0.5","171245573","171245573","CL","Chile"
++"10.53.0.6","10.53.0.6","171245574","171245574","DE","Germany"
++"10.53.0.7","10.53.0.7","171245575","171245575","EH","Western Sahara"
++EOF
+diff --git a/bin/tests/system/geoip/geoip.c b/bin/tests/system/geoip/geoip.c
+new file mode 100644
+index 0000000..e0dadad
+--- /dev/null
++++ b/bin/tests/system/geoip/geoip.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++#include <config.h>
++#include <isc/util.h>
++
++int
++main(int argc, char **argv) {
++
++	UNUSED(argc);
++	UNUSED(argv);
++
++#ifdef HAVE_GEOIP
++	return (0);
++#else
++	return (1);
++#endif
++}
+diff --git a/bin/tests/system/geoip/ns2/example.db.in b/bin/tests/system/geoip/ns2/example.db.in
+new file mode 100644
+index 0000000..52a233b
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/example.db.in
+@@ -0,0 +1,24 @@
++; Copyright (C) 2011  Internet Systems Consortium, Inc. ("ISC")
++;
++; Permission to use, copy, modify, and/or distribute this software for any
++; purpose with or without fee is hereby granted, provided that the above
++; copyright notice and this permission notice appear in all copies.
++;
++; THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++; REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++; AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++; INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++; LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++; OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++; PERFORMANCE OF THIS SOFTWARE.
++
++$TTL 300	; 5 minutes
++@			IN SOA	mname1. . (
++				2000042407 ; serial
++				20         ; refresh (20 seconds)
++				20         ; retry (20 seconds)
++				1814400    ; expire (3 weeks)
++				3600       ; minimum (1 hour)
++				)
++			NS	ns2
++ns2			A	10.53.0.2
+diff --git a/bin/tests/system/geoip/ns2/named1.conf b/bin/tests/system/geoip/ns2/named1.conf
+new file mode 100644
+index 0000000..66aca6f
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named1.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip db country country AU; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip db country country US; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip db country country GB; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip db country country CA; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip db country country CL; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip db country country DE; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip db country country EH; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named10.conf b/bin/tests/system/geoip/ns2/named10.conf
+new file mode 100644
+index 0000000..2dd52ae
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named10.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip asnum "AS100001"; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip asnum "AS100002"; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip asnum "AS100003"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip asnum "AS100004"; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip asnum "AS100005"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip asnum "AS100006"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip asnum "AS100007"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named11.conf b/bin/tests/system/geoip/ns2/named11.conf
+new file mode 100644
+index 0000000..af87edf
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named11.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip domain one.de; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip domain two.com; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip domain three.com; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip domain four.com; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip domain five.es; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip domain six.it; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip domain seven.org; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named12.conf b/bin/tests/system/geoip/ns2/named12.conf
+new file mode 100644
+index 0000000..85c0d32
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named12.conf
+@@ -0,0 +1,80 @@
++/*
++ * Copyright (C) 2013  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-sha256;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip netspeed 0; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip netspeed 1; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip netspeed 2; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip netspeed 3; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named13.conf b/bin/tests/system/geoip/ns2/named13.conf
+new file mode 100644
+index 0000000..a650a63
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named13.conf
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (C) 2014  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++acl blocking {
++	geoip db country country AU;
++};
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++	blackhole { blocking; };
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-sha256;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
+diff --git a/bin/tests/system/geoip/ns2/named14.conf b/bin/tests/system/geoip/ns2/named14.conf
+new file mode 100644
+index 0000000..f92d252
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named14.conf
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (C) 2014  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-sha256;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++acl gAU { geoip db country country AU; };
++acl gUS { geoip db country country US; };
++acl gGB { geoip db country country GB; };
++acl gCA { geoip db country country CA; };
++acl gCL { geoip db country country CL; };
++acl gDE { geoip db country country DE; };
++acl gEH { geoip db country country EH; };
++
++view one {
++	match-clients { gAU; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { gUS; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { gGB; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { gCA; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { gCL; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { gDE; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { gEH; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named15.conf b/bin/tests/system/geoip/ns2/named15.conf
+new file mode 100644
+index 0000000..6ac837b
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named15.conf
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2014  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { fd92:7065:b8e:ffff::2; };
++	recursion no;
++	geoip-directory "../data2";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-sha256;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view two {
++	match-clients { geoip country US; };
++	zone "example" {
++		type master;
++		file "../ns2/example2.db";
++	};
++};
++
++view none {
++	zone "example" {
++		type master;
++		file "examplebogus.db";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named2.conf b/bin/tests/system/geoip/ns2/named2.conf
+new file mode 100644
+index 0000000..67a5155
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named2.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip db country country AUS; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip db country country USA; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip db country country GBR; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip db country country CAN; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip db country country CHL; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip db country country DEU; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip db country country ESH; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named3.conf b/bin/tests/system/geoip/ns2/named3.conf
+new file mode 100644
+index 0000000..65113a6
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named3.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip db country country Australia; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip db country country "United States"; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip db country country "United Kingdom"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip db country country Canada; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip db country country Chile; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip db country country Germany; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip db country country "Western Sahara"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named4.conf b/bin/tests/system/geoip/ns2/named4.conf
+new file mode 100644
+index 0000000..d2393d5
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named4.conf
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip region CA; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view three {
++	match-clients { geoip region OK; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip region VA; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip region GA; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip region CO; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip region AK; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named5.conf b/bin/tests/system/geoip/ns2/named5.conf
+new file mode 100644
+index 0000000..011e310
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named5.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip db region region "California"; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip db region region "British Columbia"; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip db region region "Oklahoma"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip db region country AU; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip db region region "Colorado"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip db region region "Ontario"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip db region country NL; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named6.conf b/bin/tests/system/geoip/ns2/named6.conf
+new file mode 100644
+index 0000000..7ef7b19
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named6.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { fd92:7065:b8e:ffff::1; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip city "Redwood City"; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip city "Santa Cruz"; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip city "Oklahoma City"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip city "Ashland"; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip city "Atlanta"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip city "Morrison"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip city "Ketchikan"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named7.conf b/bin/tests/system/geoip/ns2/named7.conf
+new file mode 100644
+index 0000000..118bdbe
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named7.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip isp "One Systems, Inc."; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip isp "Two Technology Ltd."; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip isp "Three Network Labs"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip isp "Four University"; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip isp "Five Telecom"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip isp "Six Company"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip isp "Seven Communications"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named8.conf b/bin/tests/system/geoip/ns2/named8.conf
+new file mode 100644
+index 0000000..9cb5c0a
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named8.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip org "One Systems, Inc."; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip org "Two Technology Ltd."; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip org "Three Network Labs"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip org "Four University"; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip org "Five Telecom"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip org "Six Company"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip org "Seven Communications"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/ns2/named9.conf b/bin/tests/system/geoip/ns2/named9.conf
+new file mode 100644
+index 0000000..af2f7ff
+--- /dev/null
++++ b/bin/tests/system/geoip/ns2/named9.conf
+@@ -0,0 +1,104 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "../data";
++};
++
++key rndc_key {
++	secret "1234abcd8765";
++	algorithm hmac-md5;
++};
++
++controls {
++	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
++};
++
++view one {
++	match-clients { geoip asnum "AS100001 One Systems, Inc."; };
++	zone "example" {
++		type master;
++		file "example1.db";
++	};
++};
++
++view two {
++	match-clients { geoip asnum "AS100002 Two Technology Ltd."; };
++	zone "example" {
++		type master;
++		file "example2.db";
++	};
++};
++
++view three {
++	match-clients { geoip asnum "AS100003 Three Network Labs"; };
++	zone "example" {
++		type master;
++		file "example3.db";
++	};
++};
++
++view four {
++	match-clients { geoip asnum "AS100004 Four University"; };
++	zone "example" {
++		type master;
++		file "example4.db";
++	};
++};
++
++view five {
++	match-clients { geoip asnum "AS100005 Five Telecom"; };
++	zone "example" {
++		type master;
++		file "example5.db";
++	};
++};
++
++view six {
++	match-clients { geoip asnum "AS100006 Six Company"; };
++	zone "example" {
++		type master;
++		file "example6.db";
++	};
++};
++
++view seven {
++	match-clients { geoip asnum "AS100007 Seven Communications"; };
++	zone "example" {
++		type master;
++		file "example7.db";
++	};
++};
++
++view none {
++	match-clients { any; };
++	zone "example" {
++		type master;
++		file "example.db.in";
++	};
++};
+diff --git a/bin/tests/system/geoip/options.conf b/bin/tests/system/geoip/options.conf
+new file mode 100644
+index 0000000..b4d46cb
+--- /dev/null
++++ b/bin/tests/system/geoip/options.conf
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	notify-source 10.53.0.2;
++	transfer-source 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { none; };
++	recursion no;
++	geoip-directory "data";
++	allow-query {
++		geoip area 831;
++		geoip areacode 831;
++		geoip metro 828;
++		geoip metrocode 828;
++		geoip tz PST;
++		geoip timezone PST;
++		geoip postal 95060;
++		geoip postalcode 95060;
++	};
++};
++
+diff --git a/bin/tests/system/geoip/prereq.sh b/bin/tests/system/geoip/prereq.sh
+new file mode 100644
+index 0000000..b78be41
+--- /dev/null
++++ b/bin/tests/system/geoip/prereq.sh
+@@ -0,0 +1,23 @@
++#!/bin/sh
++#
++# Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++if ./geoip
++then
++    :
++else
++    echo "I:This test requires GeoIP support." >&2
++    exit 1
++fi
+diff --git a/bin/tests/system/geoip/setup.sh b/bin/tests/system/geoip/setup.sh
+new file mode 100644
+index 0000000..5c5e2ca
+--- /dev/null
++++ b/bin/tests/system/geoip/setup.sh
+@@ -0,0 +1,27 @@
++#!/bin/sh
++#
++# Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++sh clean.sh
++
++cp ns2/named1.conf ns2/named.conf
++
++for i in 1 2 3 4 5 6 7 other bogus; do
++        cp ns2/example.db.in ns2/example${i}.db
++        echo "@ IN TXT \"$i\"" >> ns2/example$i.db
++done
++
++mkdir -p data2
++cp data/GeoIPv6.dat data2/
+diff --git a/bin/tests/system/geoip/tests.sh b/bin/tests/system/geoip/tests.sh
+new file mode 100644
+index 0000000..07635b1
+--- /dev/null
++++ b/bin/tests/system/geoip/tests.sh
+@@ -0,0 +1,328 @@
++#!/bin/sh
++#
++# Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++SYSTEMTESTTOP=..
++. $SYSTEMTESTTOP/conf.sh
++
++status=0
++n=0
++
++rm -f dig.out.*
++
++DIGOPTS="+tcp +short -p 5300 @10.53.0.2"
++DIGOPTS6="+tcp +short -p 5300 @fd92:7065:b8e:ffff::2"
++
++n=`expr $n + 1`
++echo "I:checking GeoIP country database by code ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named2.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP country database by three-letter code ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named3.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP country database by name ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named4.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP region code, no specified database ($n)"
++ret=0
++lret=0
++# skipping 2 on purpose here; it has the same region code as 1
++for i in 1 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named5.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP region database by region name and country code ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named6.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++if $TESTSOCK6 fd92:7065:b8e:ffff::3
++then
++  n=`expr $n + 1`
++  echo "I:checking GeoIP city database by city name using IPv6 ($n)"
++  ret=0
++  $DIG +tcp +short -p 5300 @fd92:7065:b8e:ffff::1 -6 txt example -b fd92:7065:b8e:ffff::2 > dig.out.ns2.test$n || ret=1
++  [ $ret -eq 0 ] || echo "I:failed"
++  status=`expr $status + $ret`
++else
++  echo "I:IPv6 unavailable; skipping"
++fi
++
++n=`expr $n + 1`
++echo "I:checking GeoIP city database by city name ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named7.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP isp database ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named8.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP org database ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named9.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP asnum database ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named10.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP asnum database - ASNNNN only ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named11.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP domain database ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named12.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP netspeed database ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named13.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP blackhole ACL ($n)"
++ret=0
++$DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n || ret=1
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 status 2>&1 > rndc.out.ns2.test$n || ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:reloading server"
++cp -f ns2/named14.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++
++n=`expr $n + 1`
++echo "I:checking GeoIP country database by code (using nested ACLs) ($n)"
++ret=0
++lret=0
++for i in 1 2 3 4 5 6 7; do
++    $DIG $DIGOPTS txt example -b 10.53.0.$i > dig.out.ns2.test$n.$i || lret=1
++    j=`cat dig.out.ns2.test$n.$i | tr -d '"'`
++    [ "$i" = "$j" ] || lret=1
++    [ $lret -eq 1 ] && break
++done
++[ $lret -eq 1 ] && ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++n=`expr $n + 1`
++echo "I:reloading server with different geoip-directory ($n)"
++ret=0
++cp -f ns2/named15.conf ns2/named.conf
++$RNDC -c ../common/rndc.conf -s 10.53.0.2 -p 9953 reload 2>&1 | sed 's/^/I:ns2 /'
++sleep 3
++awk '/using "..\/data2" as GeoIP directory/ {m=1} ; { if (m>0) { print } }' ns2/named.run | grep "GeoIP City .* DB not available" > /dev/null || ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++n=`expr $n + 1`
++echo "I:checking GeoIP v4/v6 when only IPv6 database is available ($n)"
++ret=0
++$DIG $DIGOPTS -4 txt example -b 10.53.0.2 > dig.out.ns2.test$n.1 || ret=1
++j=`cat dig.out.ns2.test$n.1 | tr -d '"'`
++[ "$j" = "bogus" ] || ret=1
++if $TESTSOCK6 fd92:7065:b8e:ffff::2; then
++    $DIG $DIGOPTS6 txt example -b fd92:7065:b8e:ffff::2 > dig.out.ns2.test$n.2 || ret=1
++    j=`cat dig.out.ns2.test$n.2 | tr -d '"'`
++    [ "$j" = "2" ] || ret=1
++fi
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++n=`expr $n + 1`
++echo "I:checking other GeoIP options are parsed correctly ($n)"
++ret=0
++$CHECKCONF options.conf || ret=1
++[ $ret -eq 0 ] || echo "I:failed"
++status=`expr $status + $ret`
++
++echo "I:exit status: $status"
++exit $status
+diff --git a/config.h.in b/config.h.in
+index f2eb59a..6ed8381 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -214,6 +214,15 @@ int sigwait(const unsigned int *set, int *sig);
+ /* Define to 1 if you have the <fcntl.h> header file. */
+ #undef HAVE_FCNTL_H
+ 
++/* Build with GeoIP support */
++#undef HAVE_GEOIP
++
++/* Build with GeoIP City IPv6 support */
++#undef HAVE_GEOIP_CITY_V6
++
++/* Build with GeoIP Country IPv6 support */
++#undef HAVE_GEOIP_V6
++
+ /* Define to 1 if you have the <gssapi/gssapi.h> header file. */
+ #undef HAVE_GSSAPI_GSSAPI_H
+ 
+diff --git a/configure.in b/configure.in
+index e8c68fc..71e90c1 100644
+--- a/configure.in
++++ b/configure.in
+@@ -1252,6 +1252,99 @@ if test "$have_clock_gt" = "yes"; then
+ fi
+ 
+ 
++GEOIPLINKSRCS=
++GEOIPLINKOBJS=
++AC_ARG_WITH(geoip,
++[  --with-geoip=PATH       Build with GeoIP support (yes|no|path)],
++    use_geoip="$withval", use_geoip="no")
++
++if test "$use_geoip" = "yes"
++then
++	for d in /usr /usr/local /opt/local
++	do
++		if test -f $d/include/GeoIP.h
++		then
++			use_geoip=$d
++			break
++		fi
++	done
++fi
++
++case "$use_geoip" in
++	no|'')
++		AC_MSG_CHECKING([for GeoIP support])
++		AC_MSG_RESULT([disabled])
++		;;
++	*)
++		if test -d "$use_geoip" -o -L "$use_geoip"
++		then
++			CFLAGS="$CFLAGS -I$use_geoip/include"
++			CPPFLAGS="$CPPFLAGS -I$use_geoip/include"
++			LIBS="$LIBS -L$use_geoip/lib"
++			case "$host_os" in
++				netbsd*|openbsd*|solaris*)
++					LIBS="$LIBS -Wl,-rpath=$use_geoip/lib"
++					;;
++			esac
++		elif test "$use_geoip" = "yes"
++                then
++			AC_MSG_ERROR([GeoIP path not found])
++		else
++			AC_MSG_ERROR([GeoIP path $use_geoip does not exist])
++		fi
++		AC_CHECK_HEADER(GeoIP.h, [],
++			[AC_MSG_ERROR([GeoIP header file not found])]
++		)
++		AC_SEARCH_LIBS(GeoIP_open, GeoIP, [],
++			[AC_MSG_ERROR([GeoIP library not found])]
++		)
++		AC_SEARCH_LIBS(fabsf, m, [],
++			[AC_MSG_ERROR([Math library not found])]
++		)
++                AC_DEFINE(HAVE_GEOIP, 1, Build with GeoIP support)
++		GEOIPLINKSRCS='${GEOIPLINKSRCS}'
++		GEOIPLINKOBJS='${GEOIPLINKOBJS}'
++		AC_MSG_CHECKING([for GeoIP support])
++		AC_MSG_RESULT([yes])
++
++		AC_MSG_CHECKING([for GeoIP Country IPv6 support])
++		AC_COMPILE_IFELSE(
++			[AC_LANG_PROGRAM([
++				#include <GeoIP.h>
++				#include <netinet/in.h>
++			], [
++				struct in6_addr in6;
++				GeoIP_country_name_by_ipnum_v6(NULL, in6);
++			])],
++			[
++				AC_MSG_RESULT([yes])
++                                AC_DEFINE(HAVE_GEOIP_V6, 1, Build with GeoIP Country IPv6 support)
++			],
++			[AC_MSG_RESULT([no])]
++		)
++
++		AC_MSG_CHECKING([for GeoIP City IPv6 support])
++		AC_COMPILE_IFELSE(
++			[AC_LANG_PROGRAM([
++				#include <GeoIP.h>
++				#include <GeoIPCity.h>
++				#include <netinet/in.h>
++			], [
++				struct in6_addr in6;
++                                int i = GEOIP_CITY_EDITION_REV0_V6;
++				GeoIP_record_by_ipnum_v6(NULL, in6);
++			])],
++			[
++				AC_MSG_RESULT([yes])
++                                AC_DEFINE(HAVE_GEOIP_CITY_V6, 1, Build with GeoIP City IPv6 support)
++			],
++			[AC_MSG_RESULT([no])]
++		)
++		;;
++esac
++AC_SUBST(GEOIPLINKSRCS)
++AC_SUBST(GEOIPLINKOBJS)
++
+ AC_MSG_CHECKING(for GSSAPI library)
+ AC_ARG_WITH(gssapi,
+ [  --with-gssapi=PATH      Specify path for system-supplied GSSAPI [[default=yes]]],
+@@ -3965,6 +4058,7 @@ AC_CONFIG_FILES([
+ 	bin/tests/system/dyndb/driver/Makefile
+ 	bin/tests/system/ecdsa/prereq.sh
+ 	bin/tests/system/filter-aaaa/Makefile
++	bin/tests/system/geoip/Makefile
+ 	bin/tests/system/gost/prereq.sh
+ 	bin/tests/system/lwresd/Makefile
+ 	bin/tests/system/rpz/Makefile
+diff --git a/doc/arm/Bv9ARM-book.xml b/doc/arm/Bv9ARM-book.xml
+index 16b50a3..b79bfa0 100644
+--- a/doc/arm/Bv9ARM-book.xml
++++ b/doc/arm/Bv9ARM-book.xml
+@@ -3412,6 +3412,62 @@ $ORIGIN 0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa.
+           </tgroup>
+         </informaltable>
+ 
++        <para>
++          When <acronym>BIND</acronym> 9 is built with GeoIP support,
++          ACLs can also be used for geographic access restrictions.
++          This is done by specifying an ACL element of the form:
++          <command>geoip <optional>db <replaceable>database</replaceable></optional> <replaceable>field</replaceable> <replaceable>value</replaceable></command>
++        </para>
++        <para>
++          The <replaceable>field</replaceable> indicates which field
++          to search for a match.  Available fields are "country",
++          "region", "city", "continent", "postal" (postal code),
++          "metro" (metro code), "area" (area code), "tz" (timezone),
++          "isp", "org", "asnum", "domain" and "netspeed".
++        </para>
++        <para>
++          <replaceable>value</replaceable> is the value to searched for
++          within the database.  A string may be quoted if it contains
++          spaces or other special characters.  If this is a "country"
++          search and the string is two characters long, then it must be a
++          standard ISO-3166-1 two-letter country code, and if it is three
++          characters long then it must be an ISO-3166-1 three-letter
++          country code; otherwise it is the full name of the country.
++          Similarly, if this is a "region" search and the string is
++          two characters long, then it must be a standard two-letter state
++          or province abbreviation; otherwise it is the full name of the
++          state or province.
++        </para>
++        <para>
++          The <replaceable>database</replaceable> field indicates which
++          GeoIP database to search for a match.  In most cases this is
++          unnecessary, because most search fields can only be found in
++          a single database.  However, searches for country can be
++          answered from the "city", "region", or "country" databases,
++          and searches for region (i.e., state or provice) can be
++          answered from the "city" or "region" databases.  For these
++          search types, specifying a <replaceable>database</replaceable>
++          will force the query to be answered from that database and no
++          other.  If <replaceable>database</replaceable> is not
++          specified, then these queries will be answered from the "city",
++          database if it is installed, or the "region" database if it is
++          installed, or the "country" database, in that order.
++        </para>
++        <para>
++          Some example GeoIP ACLs:
++        </para>
++        <programlisting>geoip country US;
++geoip country JAP;
++geoip db country country Canada;
++geoip db region region WA;
++geoip city "San Francisco";
++geoip region Oklahoma;
++geoip postal 95062;
++geoip tz "America/Los_Angeles";
++geoip org "Internet Systems Consortium";
++</programlisting>
++
++
+       </sect2>
+       <sect2>
+         <title><command>controls</command> Statement Grammar</title>
+@@ -4692,6 +4748,7 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+     <optional> hostname <replaceable>hostname_string</replaceable>; </optional>
+     <optional> server-id <replaceable>server_id_string</replaceable>; </optional>
+     <optional> directory <replaceable>path_name</replaceable>; </optional>
++    <optional> geoip-directory <replaceable>path_name</replaceable>; </optional>
+     <optional> key-directory <replaceable>path_name</replaceable>; </optional>
+     <optional> managed-keys-directory <replaceable>path_name</replaceable>; </optional>
+     <optional> named-xfer <replaceable>path_name</replaceable>; </optional>
+@@ -5048,6 +5105,21 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+           </varlistentry>
+ 
+           <varlistentry>
++	    <term><command>geoip-directory</command></term>
++	    <listitem>
++	      <para>
++		Specifies the directory containing GeoIP
++		<filename>.dat</filename> database files for GeoIP
++		initialization.  By default, this option is unset
++		and the GeoIP support will use libGeoIP's
++		built-in directory.
++		(For details, see <xref linkend="acl"/> about the
++		<command>geoip</command> ACL.)
++	      </para>
++	    </listitem>
++	  </varlistentry>
++
++	  <varlistentry>
+             <term><command>key-directory</command></term>
+             <listitem>
+               <para>
+diff --git a/lib/dns/Makefile.in b/lib/dns/Makefile.in
+index 2efcc5a..ae316c5 100644
+--- a/lib/dns/Makefile.in
++++ b/lib/dns/Makefile.in
+@@ -56,6 +56,8 @@ DSTOBJS =	@DST_EXTRA_OBJS@ @OPENSSLLINKOBJS@ @PKCS11LINKOBJS@ \
+ 
+ RRLOBJS =	rrl.@O@
+ 
++GEOIPLINKOBJS = geoip.@O@
++
+ # Alphabetically
+ DNSOBJS =	acache.@O@ acl.@O@ adb.@O@ byaddr.@O@ \
+ 		cache.@O@ callbacks.@O@ clientinfo.@O@ compress.@O@ \
+@@ -75,7 +77,7 @@ DNSOBJS =	acache.@O@ acl.@O@ adb.@O@ byaddr.@O@ \
+ 		tsec.@O@ tsig.@O@ ttl.@O@ update.@O@ validator.@O@ \
+ 		version.@O@ view.@O@ xfrin.@O@ zone.@O@ zonekey.@O@ zt.@O@
+ 
+-OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
++OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@ @GEOIPLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+@@ -90,6 +92,8 @@ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ @PKCS11LINKSRCS@ \
+ 		dst_result.c gssapi_link.c gssapictx.c \
+ 		hmac_link.c key.c
+ 
++GEOIOLINKSRCS = geoip.c
++
+ DNSSRCS =	acache.c acl.c adb.c byaddr.c \
+ 		cache.c callbacks.c clientinfo.c compress.c \
+ 		db.c dbiterator.c dbtable.c diff.c dispatch.c \
+@@ -107,7 +111,7 @@ DNSSRCS =	acache.c acl.c adb.c byaddr.c \
+ 
+ RRLSRCS =	rrl.c
+ 
+-SRCS = ${DSTSRCS} ${DNSSRCS} @RRLLINKSRCS@
++SRCS = ${DSTSRCS} ${DNSSRCS} @RRLLINKSRCS@ @GEOIPLINKSRCS@
+ 
+ SUBDIRS =	include
+ TARGETS =	include/dns/enumtype.h include/dns/enumclass.h \
+diff --git a/lib/dns/acl.c b/lib/dns/acl.c
+index 3221d30..aad9aa5 100644
+--- a/lib/dns/acl.c
++++ b/lib/dns/acl.c
+@@ -29,6 +29,7 @@
+ #include <dns/acl.h>
+ #include <dns/iptable.h>
+ 
++
+ /*
+  * Create a new ACL, including an IP table and an array with room
+  * for 'n' ACL elements.  The elements are uninitialized and the
+@@ -336,6 +337,14 @@ dns_acl_merge(dns_acl_t *dest, dns_acl_t *source, isc_boolean_t pos)
+ 				return result;
+ 		}
+ 
++#ifdef HAVE_GEOIP
++		/* Duplicate GeoIP data */
++		if (source->elements[i].type == dns_aclelementtype_geoip) {
++			dest->elements[nelem + i].geoip_elem =
++				source->elements[i].geoip_elem;
++		}
++#endif
++
+ 		/* reverse sense of positives if this is a negative acl */
+ 		if (!pos && source->elements[i].negative == ISC_FALSE) {
+ 			dest->elements[nelem + i].negative = ISC_TRUE;
+@@ -386,9 +395,8 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr,
+ 			if (matchelt != NULL)
+ 				*matchelt = e;
+ 			return (ISC_TRUE);
+-		} else {
++		} else
+ 			return (ISC_FALSE);
+-		}
+ 
+ 	case dns_aclelementtype_nestedacl:
+ 		inner = e->nestedacl;
+@@ -406,6 +414,12 @@ dns_aclelement_match(const isc_netaddr_t *reqaddr,
+ 		inner = env->localnets;
+ 		break;
+ 
++#ifdef HAVE_GEOIP
++	case dns_aclelementtype_geoip:
++		if (env == NULL || env->geoip == NULL) 
++			return (ISC_FALSE);
++		return (dns_geoip_match(reqaddr, env->geoip, &e->geoip_elem));
++#endif
+ 	default:
+ 		/* Should be impossible. */
+ 		INSIST(0);
+@@ -560,7 +574,7 @@ dns_acl_isinsecure(const dns_acl_t *a) {
+ 	insecure = insecure_prefix_found;
+ 	UNLOCK(&insecure_prefix_lock);
+ 	if (insecure)
+-		return(ISC_TRUE);
++		return (ISC_TRUE);
+ 
+ 	/* Now check non-radix elements */
+ 	for (i = 0; i < a->length; i++) {
+@@ -609,6 +623,9 @@ dns_aclenv_init(isc_mem_t *mctx, dns_aclenv_t *env) {
+ 	if (result != ISC_R_SUCCESS)
+ 		goto cleanup_localhost;
+ 	env->match_mapped = ISC_FALSE;
++#ifdef HAVE_GEOIP
++	env->geoip = NULL;
++#endif
+ 	return (ISC_R_SUCCESS);
+ 
+  cleanup_localhost:
+diff --git a/lib/dns/geoip.c b/lib/dns/geoip.c
+new file mode 100644
+index 0000000..5387ebb
+--- /dev/null
++++ b/lib/dns/geoip.c
+@@ -0,0 +1,820 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/*! \file */
++
++#include <config.h>
++
++#include <isc/util.h>
++
++#include <isc/mem.h>
++#include <isc/once.h>
++#include <isc/string.h>
++
++#include <dns/acl.h>
++#include <dns/geoip.h>
++
++#include <isc/thread.h>
++#include <math.h>
++#include <netinet/in.h>
++#include <dns/log.h>
++
++#ifdef HAVE_GEOIP
++#include <GeoIP.h>
++#include <GeoIPCity.h>
++
++/*
++ * This structure preserves state from the previous GeoIP lookup,
++ * so that successive lookups for the same data from the same IP
++ * address will not require repeated calls into the GeoIP library
++ * to look up data in the database. This should improve performance
++ * somewhat.
++ *
++ * For lookups in the City and Region databases, we preserve pointers
++ * to the GeoIPRecord and GeoIPregion structures; these will need to be
++ * freed by GeoIPRecord_delete() and GeoIPRegion_delete().
++ *
++ * for lookups in ISP, AS, Org and Domain we prserve a pointer to
++ * the returned name; these must be freed by free().
++ *
++ * For lookups in Country we preserve a pointer to the text of
++ * the country code, name, etc (we use a different pointer for this
++ * than for the names returned by Org, ISP, etc, because those need
++ * to be freed but country lookups do not).
++ *
++ * For lookups in Netspeed we preserve the returned ID.
++ *
++ * XXX: Currently this mechanism is only used for IPv4 lookups; the
++ * family and addr6 fields are to be used IPv6 is added.
++ */
++typedef struct geoip_state {
++	isc_uint16_t subtype;
++	unsigned int family;
++	isc_uint32_t ipnum;
++	geoipv6_t ipnum6;
++	GeoIPRecord *record;
++	GeoIPRegion *region;
++	const char *text;
++	char *name;
++	int id;
++	isc_mem_t *mctx;
++} geoip_state_t;
++
++#ifdef ISC_PLATFORM_USETHREADS
++static isc_mutex_t key_mutex;
++static isc_boolean_t state_key_initialized = ISC_FALSE;
++static isc_thread_key_t state_key;
++static isc_once_t mutex_once = ISC_ONCE_INIT;
++static isc_mem_t *state_mctx = NULL;
++
++static void
++key_mutex_init(void) {
++	RUNTIME_CHECK(isc_mutex_init(&key_mutex) == ISC_R_SUCCESS);
++}
++
++static void
++free_state(void *arg) {
++	geoip_state_t *state = arg;
++	if (state != NULL && state->record != NULL)
++		GeoIPRecord_delete(state->record);
++	if (state != NULL)
++		isc_mem_putanddetach(&state->mctx,
++				     state, sizeof(geoip_state_t));
++	isc_thread_key_setspecific(state_key, NULL);
++}
++
++static isc_result_t
++state_key_init(void) {
++	isc_result_t result;
++
++	result = isc_once_do(&mutex_once, key_mutex_init);
++	if (result != ISC_R_SUCCESS)
++		return (result);
++
++	if (!state_key_initialized) {
++		LOCK(&key_mutex);
++		if (!state_key_initialized) {
++			int ret;
++
++			if (state_mctx == NULL)
++				result = isc_mem_create2(0, 0, &state_mctx, 0);
++			if (result != ISC_R_SUCCESS)
++				goto unlock;
++			isc_mem_setname(state_mctx, "geoip_state", NULL);
++			isc_mem_setdestroycheck(state_mctx, ISC_FALSE);
++
++			ret = isc_thread_key_create(&state_key, free_state);
++			if (ret == 0)
++				state_key_initialized = ISC_TRUE;
++			else
++				result = ISC_R_FAILURE;
++		}
++ unlock:
++		UNLOCK(&key_mutex);
++	}
++
++	return (result);
++}
++#else
++static geoip_state_t saved_state;
++#endif
++
++static void
++clean_state(geoip_state_t *state) {
++	if (state == NULL)
++		return;
++
++	if (state->record != NULL) {
++		GeoIPRecord_delete(state->record);
++		state->record = NULL;
++	}
++	if (state->region != NULL) {
++		GeoIPRegion_delete(state->region);
++		state->region = NULL;
++	}
++	if (state->name != NULL) {
++		free (state->name);
++		state->name = NULL;
++	}
++	state->ipnum = 0;
++	state->text = NULL;
++	state->id = 0;
++}
++
++static isc_result_t
++set_state(unsigned int family, isc_uint32_t ipnum, const geoipv6_t *ipnum6,
++	  dns_geoip_subtype_t subtype, GeoIPRecord *record,
++	  GeoIPRegion *region, char *name, const char *text, int id)
++{
++	geoip_state_t *state = NULL;
++#ifdef ISC_PLATFORM_USETHREADS
++	isc_result_t result;
++
++	result = state_key_init();
++	if (result != ISC_R_SUCCESS)
++		return (result);
++
++	state = (geoip_state_t *) isc_thread_key_getspecific(state_key);
++	if (state == NULL) {
++		state = (geoip_state_t *) isc_mem_get(state_mctx,
++						      sizeof(geoip_state_t));
++		if (state == NULL)
++			return (ISC_R_NOMEMORY);
++		memset(state, 0, sizeof(*state));
++
++		result = isc_thread_key_setspecific(state_key, state);
++		if (result != ISC_R_SUCCESS) {
++			isc_mem_put(state_mctx, state, sizeof(geoip_state_t));
++			return (result);
++		}
++
++		isc_mem_attach(state_mctx, &state->mctx);
++	} else
++		clean_state(state);
++#else
++	state = &saved_state;
++	clean_state(state);
++#endif
++
++	if (family == AF_INET)
++		state->ipnum = ipnum;
++	else
++		state->ipnum6 = *ipnum6;
++
++	state->family = family;
++	state->subtype = subtype;
++	state->record = record;
++	state->region = region;
++	state->name = name;
++	state->text = text;
++	state->id = id;
++
++	return (ISC_R_SUCCESS);
++}
++
++static geoip_state_t *
++get_state_for(unsigned int family, isc_uint32_t ipnum,
++	      const geoipv6_t *ipnum6)
++{
++	geoip_state_t *state;
++
++#ifdef ISC_PLATFORM_USETHREADS
++	isc_result_t result;
++
++	result = state_key_init();
++	if (result != ISC_R_SUCCESS)
++		return (NULL);
++
++	state = (geoip_state_t *) isc_thread_key_getspecific(state_key);
++	if (state == NULL)
++		return (NULL);
++#else
++	state = &saved_state;
++#endif
++
++	if (state->family == family &&
++	    ((state->family == AF_INET && state->ipnum == ipnum) ||
++	     (state->family == AF_INET6 && ipnum6 != NULL &&
++	      memcmp(state->ipnum6.s6_addr, ipnum6->s6_addr, 16) == 0)))
++		return (state);
++
++	return (NULL);
++}
++
++/*
++ * Country lookups are performed if the previous lookup was from a
++ * different IP address than the current, or was for a search of a
++ * different subtype.
++ */
++static const char *
++country_lookup(GeoIP *db, dns_geoip_subtype_t subtype,
++	       unsigned int family,
++	       isc_uint32_t ipnum, const geoipv6_t *ipnum6)
++{
++	geoip_state_t *prev_state = NULL;
++	const char *text = NULL;
++
++	REQUIRE(db != NULL);
++
++#ifndef HAVE_GEOIP_V6
++	/* no IPv6 support? give up now */
++	if (family == AF_INET6)
++		return (NULL);
++#endif
++
++	prev_state = get_state_for(family, ipnum, ipnum6);
++	if (prev_state != NULL && prev_state->subtype == subtype)
++		text = prev_state->text;
++
++	if (text == NULL) {
++		switch (subtype) {
++		case dns_geoip_country_code:
++			if (family == AF_INET)
++				text = GeoIP_country_code_by_ipnum(db, ipnum);
++#ifdef HAVE_GEOIP_V6
++			else
++				text = GeoIP_country_code_by_ipnum_v6(db,
++								      *ipnum6);
++#endif
++			break;
++		case dns_geoip_country_code3:
++			if (family == AF_INET)
++				text = GeoIP_country_code3_by_ipnum(db, ipnum);
++#ifdef HAVE_GEOIP_V6
++			else
++				text = GeoIP_country_code3_by_ipnum_v6(db,
++								       *ipnum6);
++#endif
++			break;
++		case dns_geoip_country_name:
++			if (family == AF_INET)
++				text = GeoIP_country_name_by_ipnum(db, ipnum);
++#ifdef HAVE_GEOIP_V6
++			else
++				text = GeoIP_country_name_by_ipnum_v6(db,
++								      *ipnum6);
++#endif
++			break;
++		default:
++			INSIST(0);
++		}
++
++		set_state(family, ipnum, ipnum6, subtype,
++			  NULL, NULL, NULL, text, 0);
++	}
++
++	return (text);
++}
++
++static char *
++city_string(GeoIPRecord *record, dns_geoip_subtype_t subtype, int *maxlen) {
++	const char *s;
++	char *deconst;
++
++	REQUIRE(record != NULL);
++	REQUIRE(maxlen != NULL);
++
++	/* Set '*maxlen' to the maximum length of this subtype, if any */
++	switch (subtype) {
++	case dns_geoip_city_countrycode:
++	case dns_geoip_city_region:
++	case dns_geoip_city_continentcode:
++		*maxlen = 2;
++		break;
++
++	case dns_geoip_city_countrycode3:
++		*maxlen = 3;
++		break;
++
++	default:
++		/* No fixed length; just use strcasecmp() for comparison */
++		*maxlen = 255;
++	}
++
++	switch (subtype) {
++	case dns_geoip_city_countrycode:
++		return (record->country_code);
++	case dns_geoip_city_countrycode3:
++		return (record->country_code3);
++	case dns_geoip_city_countryname:
++		return (record->country_name);
++	case dns_geoip_city_region:
++		return (record->region);
++	case dns_geoip_city_regionname:
++		s = GeoIP_region_name_by_code(record->country_code,
++					      record->region);
++		DE_CONST(s, deconst);
++		return (deconst);
++	case dns_geoip_city_name:
++		return (record->city);
++	case dns_geoip_city_postalcode:
++		return (record->postal_code);
++	case dns_geoip_city_continentcode:
++		return (record->continent_code);
++	case dns_geoip_city_timezonecode:
++		s = GeoIP_time_zone_by_country_and_region(record->country_code,
++							  record->region);
++		DE_CONST(s, deconst);
++		return (deconst);
++	default:
++		INSIST(0);
++	}
++}
++
++static isc_boolean_t
++is_city(dns_geoip_subtype_t subtype) {
++	switch (subtype) {
++	case dns_geoip_city_countrycode:
++	case dns_geoip_city_countrycode3:
++	case dns_geoip_city_countryname:
++	case dns_geoip_city_region:
++	case dns_geoip_city_regionname:
++	case dns_geoip_city_name:
++	case dns_geoip_city_postalcode:
++	case dns_geoip_city_continentcode:
++	case dns_geoip_city_timezonecode:
++	case dns_geoip_city_metrocode:
++	case dns_geoip_city_areacode:
++		return (ISC_TRUE);
++	default:
++		return (ISC_FALSE);
++	}
++}
++
++/*
++ * GeoIPRecord lookups are performed if the previous lookup was
++ * from a different IP address than the current, or was for a search
++ * outside the City database.
++ */
++static GeoIPRecord *
++city_lookup(GeoIP *db, dns_geoip_subtype_t subtype,
++	    unsigned int family, isc_uint32_t ipnum, const geoipv6_t *ipnum6)
++{
++	GeoIPRecord *record = NULL;
++	geoip_state_t *prev_state = NULL;
++
++	REQUIRE(db != NULL);
++
++#ifndef HAVE_GEOIP_V6
++	/* no IPv6 support? give up now */
++	if (family == AF_INET6)
++		return (NULL);
++#endif
++
++	prev_state = get_state_for(family, ipnum, ipnum6);
++	if (prev_state != NULL && is_city(prev_state->subtype))
++		record = prev_state->record;
++
++	if (record == NULL) {
++		if (family == AF_INET)
++			record = GeoIP_record_by_ipnum(db, ipnum);
++#ifdef HAVE_GEOIP_V6
++		else
++			record = GeoIP_record_by_ipnum_v6(db, *ipnum6);
++#endif
++		if (record == NULL)
++			return (NULL);
++
++		set_state(family, ipnum, ipnum6, subtype,
++			  record, NULL, NULL, NULL, 0);
++	}
++
++	return (record);
++}
++
++static char *
++region_string(GeoIPRegion *region, dns_geoip_subtype_t subtype, int *maxlen) {
++	const char *s;
++	char *deconst;
++
++	REQUIRE(region != NULL);
++	REQUIRE(maxlen != NULL);
++
++	switch (subtype) {
++	case dns_geoip_region_countrycode:
++		*maxlen = 2;
++		return (region->country_code);
++	case dns_geoip_region_code:
++		*maxlen = 2;
++		return (region->region);
++	case dns_geoip_region_name:
++		*maxlen = 255;
++		s = GeoIP_region_name_by_code(region->country_code,
++					      region->region);
++		DE_CONST(s, deconst);
++		return (deconst);
++	default:
++		INSIST(0);
++	}
++}
++
++static isc_boolean_t
++is_region(dns_geoip_subtype_t subtype) {
++	switch (subtype) {
++	case dns_geoip_region_countrycode:
++	case dns_geoip_region_code:
++		return (ISC_TRUE);
++	default:
++		return (ISC_FALSE);
++	}
++}
++
++/*
++ * GeoIPRegion lookups are performed if the previous lookup was
++ * from a different IP address than the current, or was for a search
++ * outside the Region database.
++ */
++static GeoIPRegion *
++region_lookup(GeoIP *db, dns_geoip_subtype_t subtype, isc_uint32_t ipnum) {
++	GeoIPRegion *region = NULL;
++	geoip_state_t *prev_state = NULL;
++
++	REQUIRE(db != NULL);
++
++	prev_state = get_state_for(AF_INET, ipnum, NULL);
++	if (prev_state != NULL && is_region(prev_state->subtype))
++		region = prev_state->region;
++
++	if (region == NULL) {
++		region = GeoIP_region_by_ipnum(db, ipnum);
++		if (region == NULL)
++			return (NULL);
++
++		set_state(AF_INET, ipnum, NULL,
++			  subtype, NULL, region, NULL, NULL, 0);
++	}
++
++	return (region);
++}
++
++/*
++ * ISP, Organization, AS Number and Domain lookups are performed if
++ * the previous lookup was from a different IP address than the current,
++ * or was for a search of a different subtype.
++ */
++static char *
++name_lookup(GeoIP *db, dns_geoip_subtype_t subtype, isc_uint32_t ipnum) {
++	char *name = NULL;
++	geoip_state_t *prev_state = NULL;
++
++	REQUIRE(db != NULL);
++
++	prev_state = get_state_for(AF_INET, ipnum, NULL);
++	if (prev_state != NULL && prev_state->subtype == subtype)
++		name = prev_state->name;
++
++	if (name == NULL) {
++		name = GeoIP_name_by_ipnum(db, ipnum);
++		if (name == NULL)
++			return (NULL);
++
++		set_state(AF_INET, ipnum, NULL,
++			  subtype, NULL, NULL, name, NULL, 0);
++	}
++
++	return (name);
++}
++
++/*
++ * Netspeed lookups are performed if the previous lookup was from a
++ * different IP address than the current, or was for a search of a
++ * different subtype.
++ */
++static int
++netspeed_lookup(GeoIP *db, dns_geoip_subtype_t subtype, isc_uint32_t ipnum) {
++	geoip_state_t *prev_state = NULL;
++	isc_boolean_t found = ISC_FALSE;
++	int id = -1;
++
++	REQUIRE(db != NULL);
++
++	prev_state = get_state_for(AF_INET, ipnum, NULL);
++	if (prev_state != NULL && prev_state->subtype == subtype) {
++		id = prev_state->id;
++		found = ISC_TRUE;
++	}
++
++	if (!found) {
++		id = GeoIP_id_by_ipnum(db, ipnum);
++		set_state(AF_INET, ipnum, NULL,
++			  subtype, NULL, NULL, NULL, NULL, id);
++	}
++
++	return (id);
++}
++#endif /* HAVE_GEOIP */
++
++#define DB46(addr, geoip, name) \
++	((addr->family == AF_INET) ? (geoip->name##_v4) : (geoip->name##_v6))
++
++#ifdef HAVE_GEOIP
++/*
++ * Find the best database to answer a generic subtype
++ */
++static dns_geoip_subtype_t
++fix_subtype(const isc_netaddr_t *reqaddr, const dns_geoip_databases_t *geoip,
++	    dns_geoip_subtype_t subtype)
++{
++	dns_geoip_subtype_t ret = subtype;
++
++	switch (subtype) {
++	case dns_geoip_countrycode:
++		if (DB46(reqaddr, geoip, city) != NULL)
++			ret = dns_geoip_city_countrycode;
++		else if (reqaddr->family == AF_INET && geoip->region != NULL)
++			ret = dns_geoip_region_countrycode;
++		else if (DB46(reqaddr, geoip, country) != NULL)
++			ret = dns_geoip_country_code;
++		break;
++	case dns_geoip_countrycode3:
++		if (DB46(reqaddr, geoip, city) != NULL)
++			ret = dns_geoip_city_countrycode3;
++		else if (DB46(reqaddr, geoip, country) != NULL)
++			ret = dns_geoip_country_code3;
++		break;
++	case dns_geoip_countryname:
++		if (DB46(reqaddr, geoip, city) != NULL)
++			ret = dns_geoip_city_countryname;
++		else if (DB46(reqaddr, geoip, country) != NULL)
++			ret = dns_geoip_country_name;
++		break;
++	case dns_geoip_region:
++		if (DB46(reqaddr, geoip, city) != NULL)
++			ret = dns_geoip_city_region;
++		else if (reqaddr->family == AF_INET && geoip->region != NULL)
++			ret = dns_geoip_region_code;
++		break;
++	case dns_geoip_regionname:
++		if (DB46(reqaddr, geoip, city) != NULL)
++			ret = dns_geoip_city_regionname;
++		else if (reqaddr->family == AF_INET && geoip->region != NULL)
++			ret = dns_geoip_region_name;
++		break;
++	default:
++		break;
++	}
++
++	return (ret);
++}
++#endif /* HAVE_GEOIP */
++
++isc_boolean_t
++dns_geoip_match(const isc_netaddr_t *reqaddr,
++		const dns_geoip_databases_t *geoip,
++		const dns_geoip_elem_t *elt)
++{
++#ifndef HAVE_GEOIP
++	UNUSED(reqaddr);
++	UNUSED(geoip);
++	UNUSED(elt);
++
++	return (ISC_FALSE);
++#else
++	GeoIP *db;
++	GeoIPRecord *record;
++	GeoIPRegion *region;
++	dns_geoip_subtype_t subtype;
++	isc_uint32_t ipnum = 0;
++	int maxlen = 0, id, family;
++	const char *cs;
++	char *s;
++#ifdef HAVE_GEOIP_V6
++	const geoipv6_t *ipnum6 = NULL;
++#else
++	const void *ipnum6 = NULL;
++#endif
++
++	INSIST(geoip != NULL);
++
++	family = reqaddr->family;
++	switch (family) {
++	case AF_INET:
++		ipnum = ntohl(reqaddr->type.in.s_addr);
++		break;
++	case AF_INET6:
++#ifdef HAVE_GEOIP_V6
++		ipnum6 = &reqaddr->type.in6;
++		break;
++#else
++		return (ISC_FALSE);
++#endif
++	default:
++		return (ISC_FALSE);
++	}
++
++	subtype = fix_subtype(reqaddr, geoip, elt->subtype);
++
++	switch (subtype) {
++	case dns_geoip_country_code:
++		maxlen = 2;
++		goto getcountry;
++
++	case dns_geoip_country_code3:
++		maxlen = 3;
++		goto getcountry;
++
++	case dns_geoip_country_name:
++		maxlen = 255;
++ getcountry:
++		db = DB46(reqaddr, geoip, country);
++		if (db == NULL)
++			return (ISC_FALSE);
++
++		INSIST(elt->as_string != NULL);
++
++		cs = country_lookup(db, subtype, family, ipnum, ipnum6);
++		if (cs != NULL && strncasecmp(elt->as_string, cs, maxlen) == 0)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_city_countrycode:
++	case dns_geoip_city_countrycode3:
++	case dns_geoip_city_countryname:
++	case dns_geoip_city_region:
++	case dns_geoip_city_regionname:
++	case dns_geoip_city_name:
++	case dns_geoip_city_postalcode:
++	case dns_geoip_city_continentcode:
++	case dns_geoip_city_timezonecode:
++		INSIST(elt->as_string != NULL);
++
++		db = DB46(reqaddr, geoip, city);
++		if (db == NULL)
++			return (ISC_FALSE);
++
++		record = city_lookup(db, subtype, family, ipnum, ipnum6);
++		if (record == NULL)
++			break;
++
++		s = city_string(record, subtype, &maxlen);
++		INSIST(maxlen != 0);
++		if (s != NULL && strncasecmp(elt->as_string, s, maxlen) == 0)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_city_metrocode:
++		db = DB46(reqaddr, geoip, city);
++		if (db == NULL)
++			return (ISC_FALSE);
++
++		record = city_lookup(db, subtype, family, ipnum, ipnum6);
++		if (record == NULL)
++			break;
++
++		if (elt->as_int == record->metro_code)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_city_areacode:
++		db = DB46(reqaddr, geoip, city);
++		if (db == NULL)
++			return (ISC_FALSE);
++
++		record = city_lookup(db, subtype, family, ipnum, ipnum6);
++		if (record == NULL)
++			break;
++
++		if (elt->as_int == record->area_code)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_region_countrycode:
++	case dns_geoip_region_code:
++	case dns_geoip_region_name:
++	case dns_geoip_region:
++		if (geoip->region == NULL)
++			return (ISC_FALSE);
++
++		INSIST(elt->as_string != NULL);
++
++		/* Region DB is not supported for IPv6 */
++		if (family == AF_INET6)
++			return (ISC_FALSE);
++
++		region = region_lookup(geoip->region, subtype, ipnum);
++		if (region == NULL)
++			break;
++
++		s = region_string(region, subtype, &maxlen);
++		INSIST(maxlen != 0);
++		if (s != NULL && strncasecmp(elt->as_string, s, maxlen) == 0)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_isp_name:
++		db = geoip->isp;
++		goto getname;
++
++	case dns_geoip_org_name:
++		db = geoip->org;
++		goto getname;
++
++	case dns_geoip_as_asnum:
++		db = geoip->as;
++		goto getname;
++
++	case dns_geoip_domain_name:
++		db = geoip->domain;
++
++ getname:
++		if (db == NULL)
++			return (ISC_FALSE);
++
++		INSIST(elt->as_string != NULL);
++		/* ISP, Org, AS, and Domain are not supported for IPv6 */
++		if (family == AF_INET6)
++			return (ISC_FALSE);
++
++		s = name_lookup(db, subtype, ipnum);
++		if (s != NULL) {
++			size_t l;
++			if (strcasecmp(elt->as_string, s) == 0)
++				return (ISC_TRUE);
++			if (subtype != dns_geoip_as_asnum)
++				break;
++			/*
++			 * Just check if the ASNNNN value matches.
++			 */
++			l = strlen(elt->as_string);
++			if (l > 0U && strchr(elt->as_string, ' ') == NULL &&
++			    strncasecmp(elt->as_string, s, l) == 0 &&
++			    s[l] == ' ')
++				return (ISC_TRUE);
++		}
++		break;
++
++	case dns_geoip_netspeed_id:
++		INSIST(geoip->netspeed != NULL);
++
++		/* Netspeed DB is not supported for IPv6 */
++		if (family == AF_INET6)
++			return (ISC_FALSE);
++
++		id = netspeed_lookup(geoip->netspeed, subtype, ipnum);
++		if (id == elt->as_int)
++			return (ISC_TRUE);
++		break;
++
++	case dns_geoip_countrycode:
++	case dns_geoip_countrycode3:
++	case dns_geoip_countryname:
++	case dns_geoip_regionname:
++		/*
++		 * If these were not remapped by fix_subtype(),
++		 * the database was unavailable. Always return false.
++		 */
++		break;
++
++	default:
++		INSIST(0);
++	}
++
++	return (ISC_FALSE);
++#endif
++}
++
++void
++dns_geoip_shutdown(void) {
++#ifdef HAVE_GEOIP
++	GeoIP_cleanup();
++#ifdef ISC_PLATFORM_USETHREADS
++	if (state_mctx != NULL)
++		isc_mem_detach(&state_mctx);
++#endif
++#else
++	return;
++#endif
++}
+diff --git a/lib/dns/include/dns/Makefile.in b/lib/dns/include/dns/Makefile.in
+index a37b35e..2fcbd1e 100644
+--- a/lib/dns/include/dns/Makefile.in
++++ b/lib/dns/include/dns/Makefile.in
+@@ -23,9 +23,9 @@ top_srcdir =	@top_srcdir@
+ 
+ HEADERS =	acl.h adb.h byaddr.h cache.h callbacks.h cert.h compress.h \
+ 		clientinfo.h db.h dbiterator.h dbtable.h diff.h dispatch.h \
+-		dlz.h dyndb.h dnssec.h ds.h events.h fixedname.h iptable.h \
+-		journal.h keyflags.h keytable.h keyvalues.h lib.h log.h \
+-		master.h masterdump.h message.h name.h ncache.h nsec.h \
++		dlz.h dyndb.h dnssec.h ds.h events.h fixedname.h geoip.h \
++		iptable.h journal.h keyflags.h keytable.h keyvalues.h lib.h \
++		log.h master.h masterdump.h message.h name.h ncache.h nsec.h \
+ 		peer.h portlist.h private.h rbt.h rcode.h \
+ 		rdata.h rdataclass.h rdatalist.h rdataset.h rdatasetiter.h \
+ 		rdataslab.h rdatatype.h request.h resolver.h result.h \
+diff --git a/lib/dns/include/dns/acl.h b/lib/dns/include/dns/acl.h
+index f4fc4a3..2c3bb37 100644
+--- a/lib/dns/include/dns/acl.h
++++ b/lib/dns/include/dns/acl.h
+@@ -38,10 +38,17 @@
+ #include <isc/netaddr.h>
+ #include <isc/refcount.h>
+ 
++#ifdef HAVE_GEOIP
++#include <dns/geoip.h>
++#endif
+ #include <dns/name.h>
+ #include <dns/types.h>
+ #include <dns/iptable.h>
+ 
++#ifdef HAVE_GEOIP
++#include <GeoIP.h>
++#endif
++
+ /***
+  *** Types
+  ***/
+@@ -52,8 +59,11 @@ typedef enum {
+ 	dns_aclelementtype_nestedacl,
+ 	dns_aclelementtype_localhost,
+ 	dns_aclelementtype_localnets,
++#ifdef HAVE_GEOIP
++	dns_aclelementtype_geoip,
++#endif /* HAVE_GEOIP */
+ 	dns_aclelementtype_any
+-} dns_aclelemettype_t;
++} dns_aclelementtype_t;
+ 
+ typedef struct dns_aclipprefix dns_aclipprefix_t;
+ 
+@@ -63,9 +73,12 @@ struct dns_aclipprefix {
+ };
+ 
+ struct dns_aclelement {
+-	dns_aclelemettype_t	type;
++	dns_aclelementtype_t	type;
+ 	isc_boolean_t		negative;
+ 	dns_name_t		keyname;
++#ifdef HAVE_GEOIP
++	dns_geoip_elem_t	geoip_elem;
++#endif /* HAVE_GEOIP */
+ 	dns_acl_t		*nestedacl;
+ 	int			node_num;
+ };
+@@ -88,6 +101,9 @@ struct dns_aclenv {
+ 	dns_acl_t *localhost;
+ 	dns_acl_t *localnets;
+ 	isc_boolean_t match_mapped;
++#ifdef HAVE_GEOIP
++	dns_geoip_databases_t *geoip;
++#endif
+ };
+ 
+ #define DNS_ACL_MAGIC		ISC_MAGIC('D','a','c','l')
+@@ -214,6 +230,10 @@ dns_acl_match(const isc_netaddr_t *reqaddr,
+  * and 'matchelt' is non-NULL, *matchelt will be pointed to the matching
+  * element.
+  *
++ * 'env' points to the current ACL environment, including the
++ * current values of localhost and localnets and (if applicable)
++ * the GeoIP context.
++ *
+  * Returns:
+  *\li	#ISC_R_SUCCESS		Always succeeds.
+  */
+diff --git a/lib/dns/include/dns/geoip.h b/lib/dns/include/dns/geoip.h
+new file mode 100644
+index 0000000..bad9485
+--- /dev/null
++++ b/lib/dns/include/dns/geoip.h
+@@ -0,0 +1,119 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++#ifndef DNS_GEOIP_H
++#define DNS_GEOIP_H 1
++
++/*****
++ ***** Module Info
++ *****/
++
++/*! \file dns/acl.h
++ * \brief
++ * Address match list handling.
++ */
++
++/***
++ *** Imports
++ ***/
++
++#include <isc/lang.h>
++#include <isc/magic.h>
++#include <isc/netaddr.h>
++#include <isc/refcount.h>
++
++#include <dns/name.h>
++#include <dns/types.h>
++#include <dns/iptable.h>
++
++#ifdef HAVE_GEOIP
++#include <GeoIP.h>
++#else
++typedef void GeoIP;
++#endif
++
++/***
++ *** Types
++ ***/
++
++typedef enum {
++	dns_geoip_countrycode,
++	dns_geoip_countrycode3,
++	dns_geoip_countryname,
++	dns_geoip_region,
++	dns_geoip_regionname,
++	dns_geoip_country_code,
++	dns_geoip_country_code3,
++	dns_geoip_country_name,
++	dns_geoip_region_countrycode,
++	dns_geoip_region_code,
++	dns_geoip_region_name,
++	dns_geoip_city_countrycode,
++	dns_geoip_city_countrycode3,
++	dns_geoip_city_countryname,
++	dns_geoip_city_region,
++	dns_geoip_city_regionname,
++	dns_geoip_city_name,
++	dns_geoip_city_postalcode,
++	dns_geoip_city_metrocode,
++	dns_geoip_city_areacode,
++	dns_geoip_city_continentcode,
++	dns_geoip_city_timezonecode,
++	dns_geoip_isp_name,
++	dns_geoip_org_name,
++	dns_geoip_as_asnum,
++	dns_geoip_domain_name,
++	dns_geoip_netspeed_id
++} dns_geoip_subtype_t;
++
++typedef struct dns_geoip_elem {
++	dns_geoip_subtype_t subtype;
++	GeoIP *db;
++	union {
++		char as_string[256];
++		int as_int;
++	};
++} dns_geoip_elem_t;
++
++typedef struct dns_geoip_databases {
++	GeoIP *country_v4;			/* DB 1        */
++	GeoIP *city_v4;				/* DB 2 or 6   */
++	GeoIP *region;				/* DB 3 or 7   */
++	GeoIP *isp;				/* DB 4        */
++	GeoIP *org;				/* DB 5        */
++	GeoIP *as;				/* DB 9        */
++	GeoIP *netspeed;			/* DB 10       */
++	GeoIP *domain;				/* DB 11       */
++	GeoIP *country_v6;			/* DB 12       */
++	GeoIP *city_v6;				/* DB 30 or 31 */
++} dns_geoip_databases_t;
++
++/***
++ *** Functions
++ ***/
++
++ISC_LANG_BEGINDECLS
++
++isc_boolean_t
++dns_geoip_match(const isc_netaddr_t *reqaddr,
++		const dns_geoip_databases_t *geoip,
++		const dns_geoip_elem_t *elt);
++
++void
++dns_geoip_shutdown(void);
++
++ISC_LANG_ENDDECLS
++#endif /* DNS_GEOIP_H */
+diff --git a/lib/dns/tests/Makefile.in b/lib/dns/tests/Makefile.in
+index 3b19784..8d1b83e 100644
+--- a/lib/dns/tests/Makefile.in
++++ b/lib/dns/tests/Makefile.in
+@@ -40,13 +40,13 @@ LIBS =		@LIBS@ @ATFLIBS@
+ OBJS =		dnstest.@O@
+ SRCS =		dnstest.c gost_test.c master_test.c dbiterator_test.c time_test.c \
+ 		private_test.c update_test.c zonemgr_test.c zt_test.c \
+-		dbdiff_test.c dispatch_test.c nsec3_test.c \
++		dbdiff_test.c geoip_test.c dispatch_test.c nsec3_test.c \
+ 		rdataset_test.c rdata_test.c
+ 
+ SUBDIRS =
+ TARGETS =	gost_test@EXEEXT@ master_test@EXEEXT@ dbiterator_test@EXEEXT@ time_test@EXEEXT@ \
+ 		private_test@EXEEXT@ update_test@EXEEXT@ zonemgr_test@EXEEXT@ \
+-		zt_test@EXEEXT@ dbversion_test@EXEEXT@ dbdiff_test@EXEEXT@ \
++		zt_test@EXEEXT@ dbversion_test@EXEEXT@ dbdiff_test@EXEEXT@ geoip_test@EXEEXT@ \
+ 		dispatch_test@EXEEXT@ nsec3_test@EXEEXT@ \
+ 		rdataset_test@EXEEXT@ rdata_test@EXEEXT@
+ 
+@@ -129,6 +129,11 @@ gost_test@EXEEXT@: gost_test.@O@ dnstest.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
+ 			gost_test.@O@ dnstest.@O@ ${DNSLIBS} \
+ 			${ISCLIBS} ${LIBS}
+ 
++geoip_test@EXEEXT@: geoip_test.@O@ ${ISCDEPLIBS} ${DNSDEPLIBS}
++	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ \
++			geoip_test.@O@ dnstest.@O@ ${DNSLIBS} \
++			${ISCLIBS} ${LIBS}
++
+ unit::
+ 	sh ${top_srcdir}/unit/unittest.sh
+ 
+diff --git a/lib/dns/tests/geoip_test.c b/lib/dns/tests/geoip_test.c
+new file mode 100644
+index 0000000..ad983b0
+--- /dev/null
++++ b/lib/dns/tests/geoip_test.c
+@@ -0,0 +1,694 @@
++/*
++ * Copyright (C) 2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/* $Id$ */
++
++/*! \file */
++
++#include <config.h>
++
++#include <atf-c.h>
++
++#include <unistd.h>
++
++#include <isc/types.h>
++
++#include <dns/geoip.h>
++
++#include "dnstest.h"
++
++#ifdef HAVE_GEOIP
++#include <GeoIP.h>
++
++/* We use GeoIP databases from the 'geoip' system test */
++#define TEST_GEOIP_DATA "../../../bin/tests/system/geoip/data"
++
++/*
++ * Helper functions
++ * (Mostly copied from bin/named/geoip.c)
++ */
++static dns_geoip_databases_t geoip = {
++	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
++};
++
++static void
++init_geoip_db(GeoIP **dbp, GeoIPDBTypes edition, GeoIPDBTypes fallback,
++	      GeoIPOptions method, const char *name)
++{
++	char *info;
++	GeoIP *db;
++
++	REQUIRE(dbp != NULL);
++
++	db = *dbp;
++
++	if (db != NULL) {
++		GeoIP_delete(db);
++		db = *dbp = NULL;
++	}
++
++	if (! GeoIP_db_avail(edition)) {
++		fprintf(stderr, "GeoIP %s (type %d) DB not available\n",
++			name, edition);
++		goto fail;
++	}
++
++	fprintf(stderr, "initializing GeoIP %s (type %d) DB\n",
++		name, edition);
++
++	db = GeoIP_open_type(edition, method);
++	if (db == NULL) {
++		fprintf(stderr,
++			"failed to initialize GeoIP %s (type %d) DB%s\n",
++			name, edition, fallback == 0
++		 	 ? "; geoip matches using this database will fail"
++			 : "");
++		goto fail;
++	}
++
++	info = GeoIP_database_info(db);
++	if (info != NULL)
++		fprintf(stderr, "%s\n", info);
++
++	*dbp = db;
++	return;
++
++ fail:
++	if (fallback != 0)
++		init_geoip_db(dbp, fallback, 0, method, name);
++}
++
++static void
++load_geoip(const char *dir) {
++	GeoIPOptions method;
++
++#ifdef _WIN32
++	method = GEOIP_STANDARD;
++#else
++	method = GEOIP_MMAP_CACHE;
++#endif
++
++	if (dir != NULL) {
++		char *p;
++		DE_CONST(dir, p);
++		GeoIP_setup_custom_directory(p);
++	}
++
++	init_geoip_db(&geoip.country_v4, GEOIP_COUNTRY_EDITION, 0,
++		      method, "Country (IPv4)");
++#ifdef HAVE_GEOIP_V6
++	init_geoip_db(&geoip.country_v6, GEOIP_COUNTRY_EDITION_V6, 0,
++		      method, "Country (IPv6)");
++#endif
++
++	init_geoip_db(&geoip.city_v4, GEOIP_CITY_EDITION_REV1,
++		      GEOIP_CITY_EDITION_REV0, method, "City (IPv4)");
++#if defined(HAVE_GEOIP_V6) && defined(HAVE_GEOIP_CITY_V6)
++	init_geoip_db(&geoip.city_v6, GEOIP_CITY_EDITION_REV1_V6,
++		      GEOIP_CITY_EDITION_REV0_V6, method, "City (IPv6)");
++#endif
++
++	init_geoip_db(&geoip.region, GEOIP_REGION_EDITION_REV1,
++		      GEOIP_REGION_EDITION_REV0, method, "Region");
++	init_geoip_db(&geoip.isp, GEOIP_ISP_EDITION, 0,
++		      method, "ISP");
++	init_geoip_db(&geoip.org, GEOIP_ORG_EDITION, 0,
++		      method, "Org");
++	init_geoip_db(&geoip.as, GEOIP_ASNUM_EDITION, 0,
++		      method, "AS");
++	init_geoip_db(&geoip.domain, GEOIP_DOMAIN_EDITION, 0,
++		      method, "Domain");
++	init_geoip_db(&geoip.netspeed, GEOIP_NETSPEED_EDITION, 0,
++		      method, "NetSpeed");
++}
++
++static isc_boolean_t
++do_lookup_string(const char *addr, dns_geoip_subtype_t subtype,
++		 const char *string)
++{
++	dns_geoip_elem_t elt;
++	struct in_addr in4;
++	isc_netaddr_t na;
++
++	inet_pton(AF_INET, addr, &in4);
++	isc_netaddr_fromin(&na, &in4);
++
++	elt.subtype = subtype;
++	strcpy(elt.as_string, string);
++
++	return (dns_geoip_match(&na, &geoip, &elt));
++}
++
++static isc_boolean_t
++do_lookup_string_v6(const char *addr, dns_geoip_subtype_t subtype,
++		    const char *string)
++{
++	dns_geoip_elem_t elt;
++	struct in6_addr in6;
++	isc_netaddr_t na;
++
++	inet_pton(AF_INET6, addr, &in6);
++	isc_netaddr_fromin6(&na, &in6);
++
++	elt.subtype = subtype;
++	strcpy(elt.as_string, string);
++
++	return (dns_geoip_match(&na, &geoip, &elt));
++}
++
++static isc_boolean_t
++do_lookup_int(const char *addr, dns_geoip_subtype_t subtype, int id) {
++	dns_geoip_elem_t elt;
++	struct in_addr in4;
++	isc_netaddr_t na;
++
++	inet_pton(AF_INET, addr, &in4);
++	isc_netaddr_fromin(&na, &in4);
++
++	elt.subtype = subtype;
++	elt.as_int = id;
++
++	return (dns_geoip_match(&na, &geoip, &elt));
++}
++
++/*
++ * Individual unit tests
++ */
++
++/* GeoIP country matching */
++ATF_TC(country);
++ATF_TC_HEAD(country, tc) {
++	atf_tc_set_md_var(tc, "descr", "test country database matching");
++}
++ATF_TC_BODY(country, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.country_v4 == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.1", dns_geoip_country_code, "AU");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_country_code3, "AUS");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_country_name, "Australia");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP country (ipv6) matching */
++ATF_TC(country_v6);
++ATF_TC_HEAD(country_v6, tc) {
++	atf_tc_set_md_var(tc, "descr", "test country (ipv6) database matching");
++}
++ATF_TC_BODY(country_v6, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.country_v6 == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_country_code, "AU");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_country_code3, "AUS");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_country_name, "Australia");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP city (ipv4) matching */
++ATF_TC(city);
++ATF_TC_HEAD(city, tc) {
++	atf_tc_set_md_var(tc, "descr", "test city database matching");
++}
++ATF_TC_BODY(city, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.city_v4 == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_continentcode, "NA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_countrycode, "US");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_countrycode3, "USA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_countryname, "United States");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_region, "CA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_regionname, "California");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_name, "Redwood City");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_city_postalcode, "94063");
++	ATF_CHECK(match);
++
++	match = do_lookup_int("10.53.0.1", dns_geoip_city_areacode, 650);
++	ATF_CHECK(match);
++
++	match = do_lookup_int("10.53.0.1", dns_geoip_city_metrocode, 807);
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP city (ipv6) matching */
++ATF_TC(city_v6);
++ATF_TC_HEAD(city_v6, tc) {
++	atf_tc_set_md_var(tc, "descr", "test city (ipv6) database matching");
++}
++ATF_TC_BODY(city_v6, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.city_v6 == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_continentcode, "NA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_countrycode, "US");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_countrycode3, "USA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_countryname,
++				    "United States");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_region, "CA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_regionname, "California");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_name, "Redwood City");
++	ATF_CHECK(match);
++
++	match = do_lookup_string_v6("fd92:7065:b8e:ffff::1",
++				    dns_geoip_city_postalcode, "94063");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++
++/* GeoIP region matching */
++ATF_TC(region);
++ATF_TC_HEAD(region, tc) {
++	atf_tc_set_md_var(tc, "descr", "test region database matching");
++}
++ATF_TC_BODY(region, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.region == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_region_code, "CA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_region_name, "California");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.1",
++				 dns_geoip_region_countrycode, "US");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/*
++ * GeoIP best-database matching
++ * (With no specified databse and a city database available, answers
++ * should come from city database.  With city database unavailable, region
++ * database.  Region database unavailable, country database.)
++ */
++ATF_TC(best);
++ATF_TC_HEAD(best, tc) {
++	atf_tc_set_md_var(tc, "descr", "test best database matching");
++}
++ATF_TC_BODY(best, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.region == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode, "US");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode3, "USA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countryname, "United States");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_regionname, "Virginia");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_region, "VA");
++	ATF_CHECK(match);
++
++	GeoIP_delete(geoip.city_v4);
++	geoip.city_v4 = NULL;
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode, "AU");
++	ATF_CHECK(match);
++
++	/*
++	 * Note, region doesn't support code3 or countryname, so
++	 * the next two would be answered from the country database instead
++	 */
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode3, "CAN");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countryname, "Canada");
++	ATF_CHECK(match);
++
++	GeoIP_delete(geoip.region);
++	geoip.region = NULL;
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode, "CA");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countrycode3, "CAN");
++	ATF_CHECK(match);
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_countryname, "Canada");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++
++/* GeoIP asnum matching */
++ATF_TC(asnum);
++ATF_TC_HEAD(asnum, tc) {
++	atf_tc_set_md_var(tc, "descr", "test asnum database matching");
++}
++ATF_TC_BODY(asnum, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.as == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++
++	match = do_lookup_string("10.53.0.3", dns_geoip_as_asnum,
++				 "AS100003 Three Network Labs");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP isp matching */
++ATF_TC(isp);
++ATF_TC_HEAD(isp, tc) {
++	atf_tc_set_md_var(tc, "descr", "test isp database matching");
++}
++ATF_TC_BODY(isp, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.isp == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.1", dns_geoip_isp_name,
++				 "One Systems, Inc.");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP org matching */
++ATF_TC(org);
++ATF_TC_HEAD(org, tc) {
++	atf_tc_set_md_var(tc, "descr", "test org database matching");
++}
++ATF_TC_BODY(org, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.org == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.2", dns_geoip_org_name,
++				 "Two Technology Ltd.");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP domain matching */
++ATF_TC(domain);
++ATF_TC_HEAD(domain, tc) {
++	atf_tc_set_md_var(tc, "descr", "test domain database matching");
++}
++ATF_TC_BODY(domain, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.domain == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_string("10.53.0.4",
++				 dns_geoip_domain_name, "four.com");
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++
++/* GeoIP netspeed matching */
++ATF_TC(netspeed);
++ATF_TC_HEAD(netspeed, tc) {
++	atf_tc_set_md_var(tc, "descr", "test netspeed database matching");
++}
++ATF_TC_BODY(netspeed, tc) {
++	isc_result_t result;
++	isc_boolean_t match;
++
++	UNUSED(tc);
++
++	result = dns_test_begin(NULL, ISC_TRUE);
++	ATF_REQUIRE(result == ISC_R_SUCCESS);
++
++	/* Use databases from the geoip system test */
++	load_geoip(TEST_GEOIP_DATA);
++
++	if (geoip.netspeed == NULL) {
++		dns_test_end();
++		atf_tc_skip("Database not available");
++	}
++
++	match = do_lookup_int("10.53.0.1", dns_geoip_netspeed_id, 0);
++	ATF_CHECK(match);
++
++	match = do_lookup_int("10.53.0.2", dns_geoip_netspeed_id, 1);
++	ATF_CHECK(match);
++
++	match = do_lookup_int("10.53.0.3", dns_geoip_netspeed_id, 2);
++	ATF_CHECK(match);
++
++	match = do_lookup_int("10.53.0.4", dns_geoip_netspeed_id, 3);
++	ATF_CHECK(match);
++
++	dns_test_end();
++}
++#else
++ATF_TC(untested);
++ATF_TC_HEAD(untested, tc) {
++	atf_tc_set_md_var(tc, "descr", "skipping geoip test");
++}
++ATF_TC_BODY(untested, tc) {
++	UNUSED(tc);
++	atf_tc_skip("GeoIP not available");
++}
++#endif
++
++/*
++ * Main
++ */
++ATF_TP_ADD_TCS(tp) {
++#ifdef HAVE_GEOIP
++	ATF_TP_ADD_TC(tp, country);
++	ATF_TP_ADD_TC(tp, country_v6);
++	ATF_TP_ADD_TC(tp, city);
++	ATF_TP_ADD_TC(tp, city_v6);
++	ATF_TP_ADD_TC(tp, region);
++	ATF_TP_ADD_TC(tp, best);
++	ATF_TP_ADD_TC(tp, asnum);
++	ATF_TP_ADD_TC(tp, isp);
++	ATF_TP_ADD_TC(tp, org);
++	ATF_TP_ADD_TC(tp, domain);
++	ATF_TP_ADD_TC(tp, netspeed);
++#else
++	ATF_TP_ADD_TC(tp, untested);
++#endif
++
++	return (atf_no_error());
++}
++
+diff --git a/lib/export/dns/Makefile.in b/lib/export/dns/Makefile.in
+index e10bf59..887acb9 100644
+--- a/lib/export/dns/Makefile.in
++++ b/lib/export/dns/Makefile.in
+@@ -67,8 +67,9 @@ DNSOBJS =	acl.@O@ adb.@O@ byaddr.@O@ \
+ 		tcpmsg.@O@ time.@O@ tsec.@O@ tsig.@O@ ttl.@O@ \
+ 		validator.@O@ version.@O@ view.@O@
+ PORTDNSOBJS =	ecdb.@O@
++GEOIPLINKOBJS = geoip.@O@
+ 
+-OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
++OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS} @GEOIPLINKOBJS@
+ 
+ # Alphabetically
+ 
+@@ -96,8 +97,9 @@ DNSSRCS =	acl.c adb.c byaddr.c \
+ 		tcpmsg.c time.c tsec.c tsig.c ttl.c \
+ 		validator.c version.c view.c
+ PORTDNSSRCS =	ecdb.c
++GEOIPLINKSRCS = geoip.c
+ 
+-SRCS = ${DSTSRCS} ${DNSSRCS} ${PORTDNSSRCS}
++SRCS = ${DSTSRCS} ${DNSSRCS} ${PORTDNSSRCS} @GEOIPLINKSRCS@
+ 
+ SUBDIRS =	include
+ TARGETS =	include/dns/enumtype.h include/dns/enumclass.h \
+diff --git a/lib/isccfg/aclconf.c b/lib/isccfg/aclconf.c
+index af56599..c415a98 100644
+--- a/lib/isccfg/aclconf.c
++++ b/lib/isccfg/aclconf.c
+@@ -31,6 +31,11 @@
+ #include <dns/fixedname.h>
+ #include <dns/log.h>
+ 
++#ifdef HAVE_GEOIP
++#include <stdlib.h>
++#include <math.h>
++#endif /* HAVE_GEOIP */
++
+ #define LOOP_MAGIC ISC_MAGIC('L','O','O','P')
+ 
+ isc_result_t
+@@ -53,6 +58,10 @@ cfg_aclconfctx_create(isc_mem_t *mctx, cfg_aclconfctx_t **ret) {
+ 	isc_mem_attach(mctx, &actx->mctx);
+ 	ISC_LIST_INIT(actx->named_acl_cache);
+ 
++#ifdef HAVE_GEOIP
++	actx->geoip = NULL;
++#endif
++
+ 	*ret = actx;
+ 	return (ISC_R_SUCCESS);
+ 
+@@ -230,11 +239,15 @@ count_acl_elements(const cfg_obj_t *caml, const cfg_obj_t *cctx,
+ 	     elt = cfg_list_next(elt)) {
+ 		const cfg_obj_t *ce = cfg_listelt_value(elt);
+ 
+-		/* negated element; just get the value. */
++		/* might be a negated element, in which case get the value. */
+ 		if (cfg_obj_istuple(ce)) {
+-			ce = cfg_tuple_get(ce, "value");
+-			if (has_negative != NULL)
+-				*has_negative = ISC_TRUE;
++			const cfg_obj_t *negated =
++				cfg_tuple_get(ce, "negated");
++			if (! cfg_obj_isvoid(negated)) {
++				ce = negated;
++				if (has_negative != NULL)
++					*has_negative = ISC_TRUE;
++			}
+ 		}
+ 
+ 		if (cfg_obj_istype(ce, &cfg_type_keyref)) {
+@@ -244,6 +257,12 @@ count_acl_elements(const cfg_obj_t *caml, const cfg_obj_t *cctx,
+ 			n += count_acl_elements(ce, cctx, &negative);
+ 			if (negative)
+ 				n++;
++#ifdef HAVE_GEOIP
++		} else if (cfg_obj_istuple(ce) &&
++			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated")))
++		{
++				n++;
++#endif /* HAVE_GEOIP */
+ 		} else if (cfg_obj_isstring(ce)) {
+ 			const char *name = cfg_obj_asstring(ce);
+ 			if (strcasecmp(name, "localhost") == 0 ||
+@@ -262,6 +281,313 @@ count_acl_elements(const cfg_obj_t *caml, const cfg_obj_t *cctx,
+ 	return n;
+ }
+ 
++#ifdef HAVE_GEOIP
++static dns_geoip_subtype_t
++get_subtype(const cfg_obj_t *obj, isc_log_t *lctx,
++	    dns_geoip_subtype_t subtype, const char *dbname)
++{
++	if (dbname == NULL)
++		return (subtype);
++
++	switch (subtype) {
++	case dns_geoip_countrycode:
++		if (strcasecmp(dbname, "city") == 0)
++			return (dns_geoip_city_countrycode);
++		else if (strcasecmp(dbname, "region") == 0)
++			return (dns_geoip_region_countrycode);
++		else if (strcasecmp(dbname, "country") == 0)
++			return (dns_geoip_country_code);
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "invalid GeoIP DB specified for "
++			    "country search: ignored");
++		return (subtype);
++	case dns_geoip_countrycode3:
++		if (strcasecmp(dbname, "city") == 0)
++			return (dns_geoip_city_countrycode3);
++		else if (strcasecmp(dbname, "country") == 0)
++			return (dns_geoip_country_code3);
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "invalid GeoIP DB specified for "
++			    "country search: ignored");
++		return (subtype);
++	case dns_geoip_countryname:
++		if (strcasecmp(dbname, "city") == 0)
++			return (dns_geoip_city_countryname);
++		else if (strcasecmp(dbname, "country") == 0)
++			return (dns_geoip_country_name);
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "invalid GeoIP DB specified for "
++			    "country search: ignored");
++		return (subtype);
++	case dns_geoip_region:
++		if (strcasecmp(dbname, "city") == 0)
++			return (dns_geoip_city_region);
++		else if (strcasecmp(dbname, "region") == 0)
++			return (dns_geoip_region_code);
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "invalid GeoIP DB specified for "
++			    "region search: ignored");
++		return (subtype);
++	case dns_geoip_regionname:
++		if (strcasecmp(dbname, "city") == 0)
++			return (dns_geoip_city_region);
++		else if (strcasecmp(dbname, "region") == 0)
++			return (dns_geoip_region_name);
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "invalid GeoIP DB specified for "
++			    "region search: ignored");
++		return (subtype);
++
++	/*
++	 * Log a warning if the wrong database was specified
++	 * on an unambiguous query
++	 */
++	case dns_geoip_city_name:
++	case dns_geoip_city_postalcode:
++	case dns_geoip_city_metrocode:
++	case dns_geoip_city_areacode:
++	case dns_geoip_city_continentcode:
++	case dns_geoip_city_timezonecode:
++		if (strcasecmp(dbname, "city") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "a 'city'-only search type: ignoring");
++		return (subtype);
++	case dns_geoip_isp_name:
++		if (strcasecmp(dbname, "isp") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "an 'isp' search: ignoring");
++		return (subtype);
++	case dns_geoip_org_name:
++		if (strcasecmp(dbname, "org") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "an 'org' search: ignoring");
++		return (subtype);
++	case dns_geoip_as_asnum:
++		if (strcasecmp(dbname, "asnum") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "an 'asnum' search: ignoring");
++		return (subtype);
++	case dns_geoip_domain_name:
++		if (strcasecmp(dbname, "domain") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "a 'domain' search: ignoring");
++		return (subtype);
++	case dns_geoip_netspeed_id:
++		if (strcasecmp(dbname, "netspeed") != 0)
++			cfg_obj_log(obj, lctx, ISC_LOG_WARNING,
++				    "invalid GeoIP DB specified for "
++				    "a 'netspeed' search: ignoring");
++		return (subtype);
++	default:
++		INSIST(0);
++	}
++}
++
++static isc_boolean_t
++geoip_can_answer(dns_aclelement_t *elt, cfg_aclconfctx_t *ctx) {
++	if (ctx->geoip == NULL)
++		return (ISC_TRUE);
++
++	switch (elt->geoip_elem.subtype) {
++	case dns_geoip_countrycode:
++	case dns_geoip_countrycode3:
++	case dns_geoip_countryname:
++		if (ctx->geoip->city_v4 != NULL ||
++		    ctx->geoip->city_v6 != NULL ||
++		    ctx->geoip->country_v4 != NULL ||
++		    ctx->geoip->country_v6 != NULL ||
++		    ctx->geoip->region != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_region:
++	case dns_geoip_regionname:
++		if (ctx->geoip->city_v4 != NULL ||
++		    ctx->geoip->city_v6 != NULL ||
++		    ctx->geoip->region != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_country_code:
++	case dns_geoip_country_code3:
++	case dns_geoip_country_name:
++		if (ctx->geoip->country_v4 != NULL ||
++		    ctx->geoip->country_v6 != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_region_countrycode:
++	case dns_geoip_region_code:
++	case dns_geoip_region_name:
++		if (ctx->geoip->region != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_city_countrycode:
++	case dns_geoip_city_countrycode3:
++	case dns_geoip_city_countryname:
++	case dns_geoip_city_region:
++	case dns_geoip_city_regionname:
++	case dns_geoip_city_name:
++	case dns_geoip_city_postalcode:
++	case dns_geoip_city_metrocode:
++	case dns_geoip_city_areacode:
++	case dns_geoip_city_continentcode:
++	case dns_geoip_city_timezonecode:
++		if (ctx->geoip->city_v4 != NULL ||
++		    ctx->geoip->city_v6 != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_isp_name:
++		if (ctx->geoip->isp != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_org_name:
++		if (ctx->geoip->org != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_as_asnum:
++		if (ctx->geoip->as != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_domain_name:
++		if (ctx->geoip->domain != NULL)
++			return (ISC_TRUE);
++	case dns_geoip_netspeed_id:
++		if (ctx->geoip->netspeed != NULL)
++			return (ISC_TRUE);
++	}
++
++	return (ISC_FALSE);
++}
++
++static isc_result_t
++parse_geoip_element(const cfg_obj_t *obj, isc_log_t *lctx,
++		    cfg_aclconfctx_t *ctx, dns_aclelement_t *dep)
++{
++	const cfg_obj_t *ge;
++	const char *dbname = NULL;
++	const char *stype, *search;
++	dns_geoip_subtype_t subtype;
++	dns_aclelement_t de;
++	size_t len;
++
++	REQUIRE(dep != NULL);
++
++	de = *dep;
++
++	ge = cfg_tuple_get(obj, "db");
++	if (!cfg_obj_isvoid(ge))
++		dbname = cfg_obj_asstring(ge);
++
++	stype = cfg_obj_asstring(cfg_tuple_get(obj, "subtype"));
++	search = cfg_obj_asstring(cfg_tuple_get(obj, "search"));
++	len = strlen(search);
++
++	if (len == 0) {
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "zero-length geoip search field");
++		return (ISC_R_FAILURE);
++	}
++
++	if (strcasecmp(stype, "country") == 0 && len == 2) {
++		/* Two-letter country code */
++		subtype = dns_geoip_countrycode;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "country") == 0 && len == 3) {
++		/* Three-letter country code */
++		subtype = dns_geoip_countrycode3;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "country") == 0) {
++		/* Country name */
++		subtype = dns_geoip_countryname;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "region") == 0 && len == 2) {
++		/* Two-letter region code */
++		subtype = dns_geoip_region;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "region") == 0) {
++		/* Region name */
++		subtype = dns_geoip_regionname;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "city") == 0) {
++		/* City name */
++		subtype = dns_geoip_city_name;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "postal") == 0 ||
++		   strcasecmp(stype, "postalcode") == 0)
++	{
++		if (len < 7) {
++			subtype = dns_geoip_city_postalcode;
++			strlcpy(de.geoip_elem.as_string, search,
++				sizeof(de.geoip_elem.as_string));
++		} else {
++			cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++				    "geoiop postal code (%s) too long",
++				    search);
++			return (ISC_R_FAILURE);
++		}
++	} else if (strcasecmp(stype, "metro") == 0 ||
++		   strcasecmp(stype, "metrocode") == 0)
++	{
++		subtype = dns_geoip_city_metrocode;
++		de.geoip_elem.as_int = atoi(search);
++	} else if (strcasecmp(stype, "area") == 0 ||
++		   strcasecmp(stype, "areacode") == 0)
++	{
++		subtype = dns_geoip_city_areacode;
++		de.geoip_elem.as_int = atoi(search);
++	} else if (strcasecmp(stype, "tz") == 0 ||
++		   strcasecmp(stype, "timezone") == 0)
++	{
++		subtype = dns_geoip_city_timezonecode;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "continent") == 0 && len == 2) {
++		/* Two-letter continent code */
++		subtype = dns_geoip_city_continentcode;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "continent") == 0) {
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "geoiop continent code (%s) too long", search);
++		return (ISC_R_FAILURE);
++	} else if (strcasecmp(stype, "isp") == 0) {
++		subtype = dns_geoip_isp_name;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "asnum") == 0) {
++		subtype = dns_geoip_as_asnum;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "org") == 0) {
++		subtype = dns_geoip_org_name;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "domain") == 0) {
++		subtype = dns_geoip_domain_name;
++		strlcpy(de.geoip_elem.as_string, search,
++			sizeof(de.geoip_elem.as_string));
++	} else if (strcasecmp(stype, "netspeed") == 0) {
++		subtype = dns_geoip_netspeed_id;
++		de.geoip_elem.as_int = atoi(search);
++	} else
++		INSIST(0);
++
++	de.geoip_elem.subtype = get_subtype(obj, lctx, subtype, dbname);
++
++	if (! geoip_can_answer(&de, ctx)) {
++		cfg_obj_log(obj, lctx, ISC_LOG_ERROR,
++			    "no GeoIP database installed which can answer "
++			    "queries of type '%s'", stype);
++		return (ISC_R_FAILURE);
++	}
++
++	*dep = de;
++
++	return (ISC_R_SUCCESS);
++}
++#endif
++
+ isc_result_t
+ cfg_acl_fromconfig(const cfg_obj_t *caml,
+ 		   const cfg_obj_t *cctx,
+@@ -317,15 +643,18 @@ cfg_acl_fromconfig(const cfg_obj_t *caml,
+ 	     elt != NULL;
+ 	     elt = cfg_list_next(elt)) {
+ 		const cfg_obj_t *ce = cfg_listelt_value(elt);
+-		isc_boolean_t	neg;
++		isc_boolean_t neg = ISC_FALSE;
+ 
+ 		if (cfg_obj_istuple(ce)) {
+-			/* This must be a negated element. */
+-			ce = cfg_tuple_get(ce, "value");
+-			neg = ISC_TRUE;
+-			dacl->has_negatives = ISC_TRUE;
+-		} else
+-			neg = ISC_FALSE;
++			/* Might be a negated element */
++			const cfg_obj_t *negated =
++				cfg_tuple_get(ce, "negated");
++			if (! cfg_obj_isvoid(negated)) {
++				neg = ISC_TRUE;
++				dacl->has_negatives = ISC_TRUE;
++				ce = negated;
++			}
++		}
+ 
+ 		/*
+ 		 * If nest_level is nonzero, then every element is
+@@ -405,6 +734,16 @@ nested_acl:
+ 						 &de->keyname);
+ 			if (result != ISC_R_SUCCESS)
+ 				goto cleanup;
++#ifdef HAVE_GEOIP
++		} else if (cfg_obj_istuple(ce) &&
++			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated")))
++		{
++			result = parse_geoip_element(ce, lctx, ctx, de);
++			if (result != ISC_R_SUCCESS)
++				goto cleanup;
++			de->type = dns_aclelementtype_geoip;
++			de->negative = neg;
++#endif /* HAVE_GEOIP */
+ 		} else if (cfg_obj_isstring(ce)) {
+ 			/* ACL name. */
+ 			const char *name = cfg_obj_asstring(ce);
+diff --git a/lib/isccfg/include/isccfg/aclconf.h b/lib/isccfg/include/isccfg/aclconf.h
+index 38ab9f6..3fb66f9 100644
+--- a/lib/isccfg/include/isccfg/aclconf.h
++++ b/lib/isccfg/include/isccfg/aclconf.h
+@@ -24,11 +24,17 @@
+ 
+ #include <isccfg/cfg.h>
+ 
++#ifdef HAVE_GEOIP
++#include <dns/geoip.h>
++#endif
+ #include <dns/types.h>
+ 
+ typedef struct cfg_aclconfctx {
+ 	ISC_LIST(dns_acl_t) named_acl_cache;
+ 	isc_mem_t *mctx;
++#ifdef HAVE_GEOIP
++	dns_geoip_databases_t *geoip;
++#endif
+ 	isc_refcount_t references;
+ } cfg_aclconfctx_t;
+ 
+diff --git a/lib/isccfg/namedconf.c b/lib/isccfg/namedconf.c
+index 62fcc96..1867506 100644
+--- a/lib/isccfg/namedconf.c
++++ b/lib/isccfg/namedconf.c
+@@ -82,6 +82,17 @@ doc_keyvalue(cfg_printer_t *pctx, const cfg_type_t *type);
+ static void
+ doc_optional_keyvalue(cfg_printer_t *pctx, const cfg_type_t *type);
+ 
++#ifdef HAVE_GEOIP
++static isc_result_t
++parse_geoip(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret);
++
++static void
++print_geoip(cfg_printer_t *pctx, const cfg_obj_t *obj);
++
++static void
++doc_geoip(cfg_printer_t *pctx, const cfg_type_t *type);
++#endif /* HAVE_GEOIP */
++
+ static cfg_type_t cfg_type_acl;
+ static cfg_type_t cfg_type_addrmatchelt;
+ static cfg_type_t cfg_type_bracketed_aml;
+@@ -935,6 +946,9 @@ options_clauses[] = {
+ 	{ "fake-iquery", &cfg_type_boolean, CFG_CLAUSEFLAG_OBSOLETE },
+ 	{ "files", &cfg_type_size, 0 },
+ 	{ "flush-zones-on-shutdown", &cfg_type_boolean, 0 },
++#ifdef HAVE_GEOIP
++	{ "geoip-directory", &cfg_type_qstringornone, 0 },
++#endif /* HAVE_GEOIP */
+ 	{ "has-old-clients", &cfg_type_boolean, CFG_CLAUSEFLAG_OBSOLETE },
+ 	{ "heartbeat-interval", &cfg_type_uint32, 0 },
+ 	{ "host-statistics", &cfg_type_boolean, CFG_CLAUSEFLAG_NOTIMP },
+@@ -2108,6 +2122,102 @@ static cfg_type_t cfg_type_optional_keyref = {
+ 	doc_optional_keyvalue, &cfg_rep_string, &key_kw
+ };
+ 
++#ifdef HAVE_GEOIP
++/*
++ * "geoip" ACL element:
++ * geoip [ db <database> ] search-type <string>
++ */
++static const char *geoiptype_enums[] = {
++	"country", "country3", "countryname", "region", "regionname",
++	"city", "postalcode", "postal", "metrocode", "metro",
++	"areacode", "area", "timezone", "tz", "continent", "isp",
++	"domain", "asnum", "org", "netspeed", NULL
++};
++static cfg_type_t cfg_type_geoiptype = {
++	"geoiptype", cfg_parse_enum, cfg_print_ustring,
++	cfg_doc_enum, &cfg_rep_string, &geoiptype_enums
++};
++
++static const char *geoipdb_enums[] = {
++	"country", "region", "city",
++	"isp", "domain", "asnum", "org", "netspeed", NULL
++};
++static cfg_type_t cfg_type_geoipdb = {
++	"geoipdb", cfg_parse_enum, cfg_print_ustring,
++	cfg_doc_enum, &cfg_rep_string, &geoipdb_enums
++};
++
++static cfg_tuplefielddef_t geoip_fields[] = {
++	{ "negated", &cfg_type_void, 0},
++	{ "db", &cfg_type_geoipdb, 0},
++	{ "subtype", &cfg_type_geoiptype, 0 },
++	{ "search", &cfg_type_astring, 0 },
++	{ NULL, NULL, 0 }
++};
++
++static cfg_type_t cfg_type_geoip = {
++	"geoip", parse_geoip, print_geoip, doc_geoip,
++	&cfg_rep_tuple, geoip_fields
++};
++
++static isc_result_t
++parse_geoip(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
++	isc_result_t result;
++	cfg_obj_t *obj = NULL;
++	const cfg_tuplefielddef_t *fields = type->of;
++
++	CHECK(cfg_create_tuple(pctx, type, &obj));
++	CHECK(cfg_parse_void(pctx, NULL, &obj->value.tuple[0]));
++
++	/* Parse the optional "db" field. */
++	CHECK(cfg_peektoken(pctx, 0));
++	if (pctx->token.type == isc_tokentype_string) {
++		CHECK(cfg_gettoken(pctx, 0));
++		if (strcasecmp(TOKEN_STRING(pctx), "db") == 0 &&
++		    obj->value.tuple[1] == NULL) {
++			CHECK(cfg_parse_obj(pctx, fields[1].type,
++				    &obj->value.tuple[1]));
++		} else {
++			CHECK(cfg_parse_void(pctx, NULL, &obj->value.tuple[1]));
++			cfg_ungettoken(pctx);
++		}
++	}
++
++	CHECK(cfg_parse_obj(pctx, fields[2].type, &obj->value.tuple[2]));
++	CHECK(cfg_parse_obj(pctx, fields[3].type, &obj->value.tuple[3]));
++
++	*ret = obj;
++	return (ISC_R_SUCCESS);
++
++ cleanup:
++	CLEANUP_OBJ(obj);
++	return (result);
++}
++
++static void
++print_geoip(cfg_printer_t *pctx, const cfg_obj_t *obj) {
++	if (obj->value.tuple[1]->type->print != cfg_print_void) {
++		cfg_print_cstr(pctx, " db ");
++		cfg_print_obj(pctx, obj->value.tuple[1]);
++	}
++	cfg_print_obj(pctx, obj->value.tuple[2]);
++	cfg_print_obj(pctx, obj->value.tuple[3]);
++}
++
++
++static void
++doc_geoip(cfg_printer_t *pctx, const cfg_type_t *type) {
++	UNUSED(type);
++	cfg_print_cstr(pctx, "[ db ");
++	cfg_doc_enum(pctx, &cfg_type_geoipdb);
++	cfg_print_cstr(pctx, " ]");
++	cfg_print_chars(pctx, " ", 1);
++	cfg_doc_enum(pctx, &cfg_type_geoiptype);
++	cfg_print_chars(pctx, " ", 1);
++	cfg_print_cstr(pctx, "<quoted_string>");
++}
++#endif /* HAVE_GEOIP */
++
+ /*%
+  * A "controls" statement is represented as a map with the multivalued
+  * "inet" and "unix" clauses.
+@@ -2251,7 +2361,9 @@ static cfg_type_t cfg_type_statschannels = {
+  * An optional class, as used in view and zone statements.
+  */
+ static isc_result_t
+-parse_optional_class(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret) {
++parse_optional_class(cfg_parser_t *pctx, const cfg_type_t *type,
++		     cfg_obj_t **ret)
++{
+ 	isc_result_t result;
+ 	UNUSED(type);
+ 	CHECK(cfg_peektoken(pctx, 0));
+@@ -2374,6 +2486,16 @@ parse_addrmatchelt(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret)
+ 		if (pctx->token.type == isc_tokentype_string &&
+ 		    (strcasecmp(TOKEN_STRING(pctx), "key") == 0)) {
+ 			CHECK(cfg_parse_obj(pctx, &cfg_type_keyref, ret));
++		} else if (pctx->token.type == isc_tokentype_string &&
++			   (strcasecmp(TOKEN_STRING(pctx), "geoip") == 0)) {
++#ifdef HAVE_GEOIP
++			CHECK(cfg_gettoken(pctx, 0));
++			CHECK(cfg_parse_obj(pctx, &cfg_type_geoip, ret));
++#else
++			cfg_parser_error(pctx, CFG_LOG_NEAR,
++					 "'geoip' not supported in this build");
++			return (ISC_R_UNEXPECTEDTOKEN);
++#endif
+ 		} else {
+ 			if (cfg_lookingat_netaddr(pctx, CFG_ADDR_V4OK |
+ 						  CFG_ADDR_V4PREFIXOK |
+@@ -2387,7 +2509,8 @@ parse_addrmatchelt(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret)
+ 	} else if (pctx->token.type == isc_tokentype_special) {
+ 		if (pctx->token.value.as_char == '{') {
+ 			/* Nested match list. */
+-			CHECK(cfg_parse_obj(pctx, &cfg_type_bracketed_aml, ret));
++			CHECK(cfg_parse_obj(pctx,
++					    &cfg_type_bracketed_aml, ret));
+ 		} else if (pctx->token.value.as_char == '!') {
+ 			CHECK(cfg_gettoken(pctx, 0)); /* read "!" */
+ 			CHECK(cfg_parse_obj(pctx, &cfg_type_negated, ret));
+@@ -2411,7 +2534,7 @@ parse_addrmatchelt(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret)
+  */
+ 
+ static cfg_tuplefielddef_t negated_fields[] = {
+-	{ "value", &cfg_type_addrmatchelt, 0 },
++	{ "negated", &cfg_type_addrmatchelt, 0 },
+ 	{ NULL, NULL, 0 }
+ };
+ 
+-- 
+2.9.3
+

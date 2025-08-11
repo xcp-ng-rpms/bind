@@ -1,0 +1,408 @@
+From c8cd2cd7f21ce56f93532a6d5f26239e60657acb Mon Sep 17 00:00:00 2001
+From: Tomas Hozza <thozza@redhat.com>
+Date: Thu, 25 Jun 2015 14:53:31 +0200
+Subject: [PATCH] nsupdate: Don't extract REAML from ticket, but leave it up to
+ GSSAPI
+
+The current implementation of nsupdate does not work correctly with
+GSSAPI in cross realm trust scenarios. The realm is currently
+extracted from local kerberos ticket instead of letting GSSAPI to
+figure out the realm based on the remote nameserver hostname.
+
+RFC 4752 section 3.1 states that the client should use
+GSS_C_NT_HOSTBASED_SERVICE when calling gss_import_name().
+
+nsupdate now leaves the realm detection up to GSSAPI, if the realm is
+not specified explicitly using the 'realm' option. If the option is
+used, the old behavior is preserved.
+
+Signed-off-by: Tomas Hozza <thozza@redhat.com>
+---
+ bin/nsupdate/nsupdate.1       |  3 +-
+ bin/nsupdate/nsupdate.c       | 72 ++++++++-----------------------------------
+ bin/nsupdate/nsupdate.docbook |  2 +-
+ bin/nsupdate/nsupdate.html    |  2 +-
+ bin/tests/dst/gsstest.c       |  4 +--
+ lib/dns/gssapictx.c           | 16 +++++++---
+ lib/dns/include/dns/tkey.h    | 24 +++++++++------
+ lib/dns/include/dst/gssapi.h  |  8 +++--
+ lib/dns/tkey.c                | 28 +++++++++--------
+ 9 files changed, 65 insertions(+), 94 deletions(-)
+
+diff --git a/bin/nsupdate/nsupdate.1 b/bin/nsupdate/nsupdate.1
+index 1e2dcaf..c847fb8 100644
+--- a/bin/nsupdate/nsupdate.1
++++ b/bin/nsupdate/nsupdate.1
+@@ -259,8 +259,7 @@ on the commandline.
+ .RS 4
+ When using GSS\-TSIG use
+ \fIrealm_name\fR
+-rather than the default realm in
+-\fIkrb5.conf\fR. If no realm is specified the saved realm is cleared.
++rather than leaving the realm detection up to GSSAPI. If no realm is specified the saved realm is cleared.
+ .RE
+ .PP
+ \fB[prereq]\fR\fB nxdomain\fR {domain\-name}
+diff --git a/bin/nsupdate/nsupdate.c b/bin/nsupdate/nsupdate.c
+index b901e03..644e3d9 100644
+--- a/bin/nsupdate/nsupdate.c
++++ b/bin/nsupdate/nsupdate.c
+@@ -2489,57 +2489,6 @@ sendrequest(isc_sockaddr_t *srcaddr, isc_sockaddr_t *destaddr,
+ 
+ #ifdef GSSAPI
+ 
+-/*
+- * Get the realm from the users kerberos ticket if possible
+- */
+-static void
+-get_ticket_realm(isc_mem_t *mctx)
+-{
+-	krb5_context ctx;
+-	krb5_error_code rc;
+-	krb5_ccache ccache;
+-	krb5_principal princ;
+-	char *name, *ticket_realm;
+-
+-	rc = krb5_init_context(&ctx);
+-	if (rc != 0)
+-		return;
+-
+-	rc = krb5_cc_default(ctx, &ccache);
+-	if (rc != 0) {
+-		krb5_free_context(ctx);
+-		return;
+-	}
+-
+-	rc = krb5_cc_get_principal(ctx, ccache, &princ);
+-	if (rc != 0) {
+-		krb5_cc_close(ctx, ccache);
+-		krb5_free_context(ctx);
+-		return;
+-	}
+-
+-	rc = krb5_unparse_name(ctx, princ, &name);
+-	if (rc != 0) {
+-		krb5_free_principal(ctx, princ);
+-		krb5_cc_close(ctx, ccache);
+-		krb5_free_context(ctx);
+-		return;
+-	}
+-
+-	ticket_realm = strrchr(name, '@');
+-	if (ticket_realm != NULL) {
+-		realm = isc_mem_strdup(mctx, ticket_realm);
+-	}
+-
+-	free(name);
+-	krb5_free_principal(ctx, princ);
+-	krb5_cc_close(ctx, ccache);
+-	krb5_free_context(ctx);
+-	if (realm != NULL && debugging)
+-		fprintf(stderr, "Found realm from ticket: %s\n", realm+1);
+-}
+-
+-
+ static void
+ start_gssrequest(dns_name_t *master) {
+ 	gss_ctx_id_t context;
+@@ -2580,11 +2529,15 @@ start_gssrequest(dns_name_t *master) {
+ 	dns_fixedname_init(&fname);
+ 	servname = dns_fixedname_name(&fname);
+ 
+-	if (realm == NULL)
+-		get_ticket_realm(mctx);
+-
+-	result = isc_string_printf(servicename, sizeof(servicename),
+-				   "DNS/%s%s", namestr, realm ? realm : "");
++	if (realm != NULL) {
++		/* Use explicit REALM passed as argument */
++		result = isc_string_printf(servicename, sizeof(servicename),
++				   "DNS/%s%s", namestr, realm);
++	} else {
++		/* Use service@host as advised in RFC4752 section 3.1 */
++		result = isc_string_printf(servicename, sizeof(servicename),
++				   "DNS@%s", namestr);
++	}
+ 	if (result != ISC_R_SUCCESS)
+ 		fatal("isc_string_printf(servicename) failed: %s",
+ 		      isc_result_totext(result));
+@@ -2623,9 +2576,9 @@ start_gssrequest(dns_name_t *master) {
+ 
+ 	/* Build first request. */
+ 	context = GSS_C_NO_CONTEXT;
+-	result = dns_tkey_buildgssquery(rmsg, keyname, servname, NULL, 0,
+-					&context, use_win2k_gsstsig,
+-					mctx, &err_message);
++	result = dns_tkey_buildgssquery(rmsg, keyname, servname,
++					realm != NULL ? ISC_TRUE : ISC_FALSE, NULL, 0,
++					&context, use_win2k_gsstsig, mctx, &err_message);
+ 	if (result == ISC_R_FAILURE)
+ 		fatal("tkey query failed: %s",
+ 		      err_message != NULL ? err_message : "unknown error");
+@@ -2765,6 +2718,7 @@ recvgss(isc_task_t *task, isc_event_t *event) {
+ 
+ 	tsigkey = NULL;
+ 	result = dns_tkey_gssnegotiate(tsigquery, rcvmsg, servname,
++				       realm != NULL ? ISC_TRUE : ISC_FALSE,
+ 				       &context, &tsigkey, gssring,
+ 				       use_win2k_gsstsig,
+ 				       &err_message);
+diff --git a/bin/nsupdate/nsupdate.docbook b/bin/nsupdate/nsupdate.docbook
+index c54211c..bbcc681 100644
+--- a/bin/nsupdate/nsupdate.docbook
++++ b/bin/nsupdate/nsupdate.docbook
+@@ -418,7 +418,7 @@
+           <listitem>
+             <para>
+ 	      When using GSS-TSIG use <parameter>realm_name</parameter> rather
+-	      than the default realm in <filename>krb5.conf</filename>.  If no
++	      than leaving the realm detection up to GSSAPI.  If no
+ 	      realm is specified the saved realm is cleared.
+             </para>
+           </listitem>
+diff --git a/bin/nsupdate/nsupdate.html b/bin/nsupdate/nsupdate.html
+index 276d4af..9c0eba0 100644
+--- a/bin/nsupdate/nsupdate.html
++++ b/bin/nsupdate/nsupdate.html
+@@ -327,7 +327,7 @@
+           </span></dt>
+ <dd><p>
+ 	      When using GSS-TSIG use <em class="parameter"><code>realm_name</code></em> rather
+-	      than the default realm in <code class="filename">krb5.conf</code>.  If no
++	      than leaving the realm detection up to GSSAPI.  If no
+ 	      realm is specified the saved realm is cleared.
+             </p></dd>
+ <dt><span class="term">
+diff --git a/bin/tests/dst/gsstest.c b/bin/tests/dst/gsstest.c
+index c1296f7..7c85d0b 100755
+--- a/bin/tests/dst/gsstest.c
++++ b/bin/tests/dst/gsstest.c
+@@ -309,7 +309,7 @@ initctx2(isc_task_t *task, isc_event_t *event) {
+ 	printf("Received token from server, calling gss_init_sec_context()\n");
+ 	isc_buffer_init(&outtoken, array, DNS_NAME_MAXTEXT + 1);
+ 	result = dns_tkey_processgssresponse(query, response,
+-					     dns_fixedname_name(&gssname),
++					     dns_fixedname_name(&gssname), ISC_FALSE,
+ 					     &gssctx, &outtoken,
+ 					     &tsigkey, ring, NULL);
+ 	gssctx = *gssctxp;
+@@ -396,7 +396,7 @@ initctx1(isc_task_t *task, isc_event_t *event) {
+ 	printf("Calling gss_init_sec_context()\n");
+ 	gssctx = GSS_C_NO_CONTEXT;
+ 	result = dns_tkey_buildgssquery(query, dns_fixedname_name(&servername),
+-					dns_fixedname_name(&gssname),
++					dns_fixedname_name(&gssname), ISC_FALSE,
+ 					NULL, 36000, &gssctx, ISC_TRUE,
+ 					mctx, NULL);
+ 	CHECK("dns_tkey_buildgssquery", result);
+diff --git a/lib/dns/gssapictx.c b/lib/dns/gssapictx.c
+index aeaeb85..21222e0 100644
+--- a/lib/dns/gssapictx.c
++++ b/lib/dns/gssapictx.c
+@@ -558,14 +558,15 @@ gss_err_message(isc_mem_t *mctx, isc_uint32_t major, isc_uint32_t minor,
+ #endif
+ 
+ isc_result_t
+-dst_gssapi_initctx(dns_name_t *name, isc_buffer_t *intoken,
+-		   isc_buffer_t *outtoken, gss_ctx_id_t *gssctx,
+-		   isc_mem_t *mctx, char **err_message)
++dst_gssapi_initctx(dns_name_t *name, isc_boolean_t explicit_realm,
++		   isc_buffer_t *intoken, isc_buffer_t *outtoken,
++		   gss_ctx_id_t *gssctx, isc_mem_t *mctx, char **err_message)
+ {
+ #ifdef GSSAPI
+ 	isc_region_t r;
+ 	isc_buffer_t namebuf;
+ 	gss_name_t gname;
++	gss_OID gname_type;
+ 	OM_uint32 gret, minor, ret_flags, flags;
+ 	gss_buffer_desc gintoken, *gintokenp, gouttoken = GSS_C_EMPTY_BUFFER;
+ 	isc_result_t result;
+@@ -580,7 +581,13 @@ dst_gssapi_initctx(dns_name_t *name, isc_buffer_t *intoken,
+ 	name_to_gbuffer(name, &namebuf, &gnamebuf);
+ 
+ 	/* Get the name as a GSS name */
+-	gret = gss_import_name(&minor, &gnamebuf, GSS_C_NO_OID, &gname);
++	if (explicit_realm == ISC_TRUE) {
++		gname_type = GSS_C_NO_OID;
++	} else {
++		gname_type = GSS_C_NT_HOSTBASED_SERVICE;
++	}
++
++	gret = gss_import_name(&minor, &gnamebuf, gname_type, &gname);
+ 	if (gret != GSS_S_COMPLETE) {
+ 		gss_err_message(mctx, gret, minor, err_message);
+ 		result = ISC_R_FAILURE;
+@@ -642,6 +649,7 @@ dst_gssapi_initctx(dns_name_t *name, isc_buffer_t *intoken,
+ 	return (result);
+ #else
+ 	UNUSED(name);
++	UNUSED(explicit_realm);
+ 	UNUSED(intoken);
+ 	UNUSED(outtoken);
+ 	UNUSED(gssctx);
+diff --git a/lib/dns/include/dns/tkey.h b/lib/dns/include/dns/tkey.h
+index 0dcec1e..a0e6c2a 100644
+--- a/lib/dns/include/dns/tkey.h
++++ b/lib/dns/include/dns/tkey.h
+@@ -123,9 +123,9 @@ dns_tkey_builddhquery(dns_message_t *msg, dst_key_t *key, dns_name_t *name,
+ 
+ isc_result_t
+ dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
+-		       isc_buffer_t *intoken, isc_uint32_t lifetime,
+-		       gss_ctx_id_t *context, isc_boolean_t win2k,
+-		       isc_mem_t *mctx, char **err_message);
++		       isc_boolean_t explicit_realm, isc_buffer_t *intoken,
++		       isc_uint32_t lifetime, gss_ctx_id_t *context,
++		       isc_boolean_t win2k, isc_mem_t *mctx, char **err_message);
+ /*%<
+  *	Builds a query containing a TKEY that will generate a GSSAPI context.
+  *	The key is requested to have the specified lifetime (in seconds).
+@@ -134,6 +134,8 @@ dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
+  *\li		'msg'	  is a valid message
+  *\li		'name'	  is a valid name
+  *\li		'gname'	  is a valid name
++ *\li		'explicit_realm' ISC_TRUE if an explicit realm is used,
++ *			  ISC_FALSE if the realm detection is left up to GSSAPI.
+  *\li		'context' is a pointer to a valid gss_ctx_id_t
+  *			  (which may have the value GSS_C_NO_CONTEXT)
+  *\li		'win2k'   when true says to turn on some hacks to work
+@@ -188,9 +190,10 @@ dns_tkey_processdhresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+ 
+ isc_result_t
+ dns_tkey_processgssresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+-			    dns_name_t *gname, gss_ctx_id_t *context,
+-			    isc_buffer_t *outtoken, dns_tsigkey_t **outkey,
+-			    dns_tsig_keyring_t *ring, char **err_message);
++			    dns_name_t *gname, isc_boolean_t explicit_realm,
++			    gss_ctx_id_t *context, isc_buffer_t *outtoken,
++			    dns_tsigkey_t **outkey, dns_tsig_keyring_t *ring,
++			    char **err_message);
+ /*%<
+  * XXX
+  */
+@@ -216,9 +219,10 @@ dns_tkey_processdeleteresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+ 
+ isc_result_t
+ dns_tkey_gssnegotiate(dns_message_t *qmsg, dns_message_t *rmsg,
+-		      dns_name_t *server, gss_ctx_id_t *context,
+-		      dns_tsigkey_t **outkey, dns_tsig_keyring_t *ring,
+-		      isc_boolean_t win2k, char **err_message);
++		      dns_name_t *server, isc_boolean_t explicit_realm,
++		      gss_ctx_id_t *context, dns_tsigkey_t **outkey,
++		      dns_tsig_keyring_t *ring, isc_boolean_t win2k,
++		      char **err_message);
+ 
+ /*
+  *	Client side negotiation of GSS-TSIG.  Process the response
+@@ -231,6 +235,8 @@ dns_tkey_gssnegotiate(dns_message_t *qmsg, dns_message_t *rmsg,
+  *			     it will be filled with the new message to send
+  *		'rmsg'    is a valid message, the incoming TKEY message
+  *		'server'  is the server name
++ *		'explicit_realm' ISC_TRUE if an explicit realm is used,
++ *			      ISC_FALSE if the realm detection is left up to GSSAPI.
+  *		'context' is the input context handle
+  *		'outkey'  receives the established key, if non-NULL;
+  *			      if non-NULL must point to NULL
+diff --git a/lib/dns/include/dst/gssapi.h b/lib/dns/include/dst/gssapi.h
+index 1e81a55..d093fa3 100644
+--- a/lib/dns/include/dst/gssapi.h
++++ b/lib/dns/include/dst/gssapi.h
+@@ -93,15 +93,17 @@ dst_gssapi_releasecred(gss_cred_id_t *cred);
+  */
+ 
+ isc_result_t
+-dst_gssapi_initctx(dns_name_t *name, isc_buffer_t *intoken,
+-		   isc_buffer_t *outtoken, gss_ctx_id_t *gssctx,
+-		   isc_mem_t *mctx, char **err_message);
++dst_gssapi_initctx(dns_name_t *name, isc_boolean_t explicit_realm,
++		   isc_buffer_t *intoken, isc_buffer_t *outtoken,
++		   gss_ctx_id_t *gssctx, isc_mem_t *mctx, char **err_message);
+ /*
+  *	Initiates a GSS context.
+  *
+  *	Requires:
+  * 	'name'     is a valid name, preferably one known by the GSS
+  * 	provider
++ * 	'explicit_realm' True if the REALM is explicitly included in the 'name',
++ *  	   otherwise leave the REALM detection up to GSSAPI
+  * 	'intoken'  is a token received from the acceptor, or NULL if
+  *		   there isn't one
+  * 	'outtoken' is a buffer to receive the token generated by
+diff --git a/lib/dns/tkey.c b/lib/dns/tkey.c
+index 20c98e5..3463d3a 100644
+--- a/lib/dns/tkey.c
++++ b/lib/dns/tkey.c
+@@ -1016,9 +1016,9 @@ dns_tkey_builddhquery(dns_message_t *msg, dst_key_t *key, dns_name_t *name,
+ 
+ isc_result_t
+ dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
+-		       isc_buffer_t *intoken, isc_uint32_t lifetime,
+-		       gss_ctx_id_t *context, isc_boolean_t win2k,
+-		       isc_mem_t *mctx, char **err_message)
++		       isc_boolean_t explicit_realm, isc_buffer_t *intoken,
++		       isc_uint32_t lifetime, gss_ctx_id_t *context,
++		       isc_boolean_t win2k, isc_mem_t *mctx, char **err_message)
+ {
+ 	dns_rdata_tkey_t tkey;
+ 	isc_result_t result;
+@@ -1035,7 +1035,7 @@ dns_tkey_buildgssquery(dns_message_t *msg, dns_name_t *name, dns_name_t *gname,
+ 	REQUIRE(mctx != NULL);
+ 
+ 	isc_buffer_init(&token, array, sizeof(array));
+-	result = dst_gssapi_initctx(gname, NULL, &token, context,
++	result = dst_gssapi_initctx(gname, explicit_realm, NULL, &token, context,
+ 				    mctx, err_message);
+ 	if (result != DNS_R_CONTINUE && result != ISC_R_SUCCESS)
+ 		return (result);
+@@ -1251,9 +1251,10 @@ dns_tkey_processdhresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+ 
+ isc_result_t
+ dns_tkey_processgssresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+-			    dns_name_t *gname, gss_ctx_id_t *context,
+-			    isc_buffer_t *outtoken, dns_tsigkey_t **outkey,
+-			    dns_tsig_keyring_t *ring, char **err_message)
++			    dns_name_t *gname, isc_boolean_t explicit_realm,
++			    gss_ctx_id_t *context, isc_buffer_t *outtoken,
++			    dns_tsigkey_t **outkey, dns_tsig_keyring_t *ring,
++			    char **err_message)
+ {
+ 	dns_rdata_t rtkeyrdata = DNS_RDATA_INIT, qtkeyrdata = DNS_RDATA_INIT;
+ 	dns_name_t *tkeyname;
+@@ -1304,7 +1305,7 @@ dns_tkey_processgssresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+ 
+ 	isc_buffer_init(outtoken, array, sizeof(array));
+ 	isc_buffer_init(&intoken, rtkey.key, rtkey.keylen);
+-	RETERR(dst_gssapi_initctx(gname, &intoken, outtoken, context,
++	RETERR(dst_gssapi_initctx(gname, explicit_realm, &intoken, outtoken, context,
+ 				  ring->mctx, err_message));
+ 
+ 	RETERR(dst_key_fromgssapi(dns_rootname, *context, rmsg->mctx,
+@@ -1384,9 +1385,10 @@ dns_tkey_processdeleteresponse(dns_message_t *qmsg, dns_message_t *rmsg,
+ 
+ isc_result_t
+ dns_tkey_gssnegotiate(dns_message_t *qmsg, dns_message_t *rmsg,
+-		      dns_name_t *server, gss_ctx_id_t *context,
+-		      dns_tsigkey_t **outkey, dns_tsig_keyring_t *ring,
+-		      isc_boolean_t win2k, char **err_message)
++		      dns_name_t *server, isc_boolean_t explicit_realm,
++		      gss_ctx_id_t *context, dns_tsigkey_t **outkey,
++		      dns_tsig_keyring_t *ring, isc_boolean_t win2k,
++		      char **err_message)
+ {
+ 	dns_rdata_t rtkeyrdata = DNS_RDATA_INIT, qtkeyrdata = DNS_RDATA_INIT;
+ 	dns_name_t *tkeyname;
+@@ -1430,8 +1432,8 @@ dns_tkey_gssnegotiate(dns_message_t *qmsg, dns_message_t *rmsg,
+ 	isc_buffer_init(&intoken, rtkey.key, rtkey.keylen);
+ 	isc_buffer_init(&outtoken, array, sizeof(array));
+ 
+-	result = dst_gssapi_initctx(server, &intoken, &outtoken, context,
+-				    ring->mctx, err_message);
++	result = dst_gssapi_initctx(server, explicit_realm, &intoken, &outtoken,
++					context, ring->mctx, err_message);
+ 	if (result != DNS_R_CONTINUE && result != ISC_R_SUCCESS)
+ 		return (result);
+ 
+-- 
+2.4.3
+

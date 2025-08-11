@@ -1,0 +1,482 @@
+From e92ac3b83209ddc46ca9a3facd7edf1f14052edf Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Wed, 8 Feb 2017 13:49:47 +0100
+Subject: [PATCH] 4558.   [bug]       Synthesised CNAME before matching DNAME
+ was still                     being cached when it should not have been.  [RT
+ #44318]
+
+Fixes and tests last case fixed by CVE-2016-9147
+---
+ bin/tests/system/dname/ans3/ans.pl |  95 +++++++++++++++++++++++
+ bin/tests/system/dname/ns1/root.db |   5 +-
+ bin/tests/system/dname/tests.sh    |  25 ++++++-
+ lib/dns/resolver.c                 | 150 +++++++++++++++++++++++++------------
+ 4 files changed, 225 insertions(+), 50 deletions(-)
+ create mode 100644 bin/tests/system/dname/ans3/ans.pl
+
+diff --git a/bin/tests/system/dname/ans3/ans.pl b/bin/tests/system/dname/ans3/ans.pl
+new file mode 100644
+index 0000000..271fc7d
+--- /dev/null
++++ b/bin/tests/system/dname/ans3/ans.pl
+@@ -0,0 +1,95 @@
++#!/usr/bin/env perl
++#
++# Copyright (C) 2014-2016  Internet Systems Consortium, Inc. ("ISC")
++#
++# This Source Code Form is subject to the terms of the Mozilla Public
++# License, v. 2.0. If a copy of the MPL was not distributed with this
++# file, You can obtain one at http://mozilla.org/MPL/2.0/.
++
++use strict;
++use warnings;
++
++use IO::File;
++use Getopt::Long;
++use Net::DNS::Nameserver;
++
++my $pidf = new IO::File "ans.pid", "w" or die "cannot open pid file: $!";
++print $pidf "$$\n" or die "cannot write pid file: $!";
++$pidf->close or die "cannot close pid file: $!";
++sub rmpid { unlink "ans.pid"; exit 1; };
++
++$SIG{INT} = \&rmpid;
++$SIG{TERM} = \&rmpid;
++
++my $localaddr = "10.53.0.3";
++my $localport = 5300;
++my $verbose = 0;
++my $ttl = 60;
++my $zone = "example.broken";
++my $nsname = "ns3.$zone";
++my $synth = "synth-then-dname.$zone";
++my $synth2 = "synth2-then-dname.$zone";
++
++sub reply_handler {
++    my ($qname, $qclass, $qtype, $peerhost, $query, $conn) = @_;
++    my ($rcode, @ans, @auth, @add);
++
++    print ("request: $qname/$qtype\n");
++    STDOUT->flush();
++
++    if ($qname eq "example.broken") {
++        if ($qtype eq "SOA") {
++	    my $rr = new Net::DNS::RR("$qname $ttl $qclass SOA . . 0 0 0 0 0");
++	    push @ans, $rr;
++        } elsif ($qtype eq "NS") {
++	    my $rr = new Net::DNS::RR("$qname $ttl $qclass NS $nsname");
++	    push @ans, $rr;
++	    $rr = new Net::DNS::RR("$nsname $ttl $qclass A $localaddr");
++	    push @add, $rr;
++        }
++        $rcode = "NOERROR";
++    } elsif ($qname eq "cname-to-$synth2") {
++        my $rr = new Net::DNS::RR("$qname $ttl $qclass CNAME name.$synth2");
++	push @ans, $rr;
++        $rr = new Net::DNS::RR("name.$synth2 $ttl $qclass CNAME name");
++	push @ans, $rr;
++        $rr = new Net::DNS::RR("$synth2 $ttl $qclass DNAME .");
++	push @ans, $rr;
++	$rcode = "NOERROR";
++    } elsif ($qname eq "$synth" || $qname eq "$synth2") {
++	if ($qtype eq "DNAME") {
++	    my $rr = new Net::DNS::RR("$qname $ttl $qclass DNAME .");
++	    push @ans, $rr;
++	}
++	$rcode = "NOERROR";
++    } elsif ($qname eq "name.$synth") {
++	my $rr = new Net::DNS::RR("$qname $ttl $qclass CNAME name.");
++	push @ans, $rr;
++	$rr = new Net::DNS::RR("$synth $ttl $qclass DNAME .");
++	push @ans, $rr;
++	$rcode = "NOERROR";
++    } elsif ($qname eq "name.$synth2") {
++	my $rr = new Net::DNS::RR("$qname $ttl $qclass CNAME name.");
++	push @ans, $rr;
++	$rr = new Net::DNS::RR("$synth2 $ttl $qclass DNAME .");
++	push @ans, $rr;
++	$rcode = "NOERROR";
++    } else {
++	$rcode = "REFUSED";
++    }
++    return ($rcode, \@ans, \@auth, \@add, { aa => 1 });
++}
++
++GetOptions(
++    'port=i' => \$localport,
++    'verbose!' => \$verbose,
++);
++
++my $ns = Net::DNS::Nameserver->new(
++    LocalAddr => $localaddr,
++    LocalPort => $localport,
++    ReplyHandler => \&reply_handler,
++    Verbose => $verbose,
++);
++
++$ns->main_loop;
+diff --git a/bin/tests/system/dname/ns1/root.db b/bin/tests/system/dname/ns1/root.db
+index 7049e77..2e84ae0 100644
+--- a/bin/tests/system/dname/ns1/root.db
++++ b/bin/tests/system/dname/ns1/root.db
+@@ -12,8 +12,6 @@
+ ; OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ ; PERFORMANCE OF THIS SOFTWARE.
+ 
+-; $Id: root.db,v 1.2 2011/03/18 21:14:19 fdupont Exp $
+-
+ $TTL 300
+ . 			IN SOA	gson.nominum.com. a.root.servers.nil. (
+ 				2000042100   	; serial
+@@ -27,3 +25,6 @@ a.root-servers.nil.	A	10.53.0.1
+ 
+ example.		NS	ns2.example.
+ ns2.example.		A	10.53.0.2
++
++example.broken.		NS	ns3.example.broken.
++ns3.example.broken.	A	10.53.0.3
+diff --git a/bin/tests/system/dname/tests.sh b/bin/tests/system/dname/tests.sh
+index 04bfcb2..6dc9e88 100644
+--- a/bin/tests/system/dname/tests.sh
++++ b/bin/tests/system/dname/tests.sh
+@@ -20,6 +20,7 @@ SYSTEMTESTTOP=..
+ . $SYSTEMTESTTOP/conf.sh
+ 
+ status=0
++n=0
+ 
+ echo "I:checking short dname from authoritative"
+ ret=0
+@@ -81,6 +82,26 @@ grep '^a.target.example.' dig.out.ns4.cname > /dev/null || ret=1
+ if [ $ret != 0 ]; then echo "I:failed"; fi
+ status=`expr $status + $ret`
+ 
+-echo "I:exit status: $status"
++n=`expr $n + 1`
++echo "I:checking dname is returned with synthesized cname before dname ($n)"
++ret=0
++$DIG @10.53.0.4 -p 5300 name.synth-then-dname.example.broken A > dig.out.test$n
++grep "status: NXDOMAIN" dig.out.test$n > /dev/null || ret=1
++grep '^name.synth-then-dname\.example\.broken\..*CNAME.*name.$' dig.out.test$n > /dev/null || ret=1
++grep '^synth-then-dname\.example\.broken\..*DNAME.*\.$' dig.out.test$n > /dev/null || ret=1
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
+ 
+-exit $status
++n=`expr $n + 1`
++echo "I:checking dname is returned with cname to synthesized cname before dname ($n)"
++ret=0
++$DIG @10.53.0.4 -p 5300 cname-to-synth2-then-dname.example.broken A > dig.out.test$n
++grep "status: NXDOMAIN" dig.out.test$n > /dev/null || ret=1
++grep '^cname-to-synth2-then-dname\.example\.broken\..*CNAME.*name\.synth2-then-dname\.example\.broken.$' dig.out.test$n > /dev/null || ret=1
++grep '^name\.synth2-then-dname\.example\.broken\..*CNAME.*name.$' dig.out.test$n > /dev/null || ret=1
++grep '^synth2-then-dname\.example\.broken\..*DNAME.*\.$' dig.out.test$n > /dev/null || ret=1
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:exit status: $status"
++[ $status -eq 0 ] || exit 1
+diff --git a/lib/dns/resolver.c b/lib/dns/resolver.c
+index bfd4dcb..c3607fa 100644
+--- a/lib/dns/resolver.c
++++ b/lib/dns/resolver.c
+@@ -5406,9 +5406,13 @@ cname_target(dns_rdataset_t *rdataset, dns_name_t *tname) {
+ 	return (ISC_R_SUCCESS);
+ }
+ 
++/*%
++ * Construct the synthesised CNAME from the existing QNAME and
++ * the DNAME RR and store it in 'target'.
++ */
+ static inline isc_result_t
+ dname_target(dns_rdataset_t *rdataset, dns_name_t *qname,
+-	     unsigned int nlabels, dns_fixedname_t *fixeddname)
++	     unsigned int nlabels, dns_name_t *target)
+ {
+ 	isc_result_t result;
+ 	dns_rdata_t rdata = DNS_RDATA_INIT;
+@@ -5428,14 +5432,33 @@ dname_target(dns_rdataset_t *rdataset, dns_name_t *qname,
+ 
+ 	dns_fixedname_init(&prefix);
+ 	dns_name_split(qname, nlabels, dns_fixedname_name(&prefix), NULL);
+-	dns_fixedname_init(fixeddname);
+ 	result = dns_name_concatenate(dns_fixedname_name(&prefix),
+-				      &dname.dname,
+-				      dns_fixedname_name(fixeddname), NULL);
++				      &dname.dname, target, NULL);
+ 	dns_rdata_freestruct(&dname);
+ 	return (result);
+ }
+ 
++/*%
++ * Check if it was possible to construct 'qname' from 'lastcname'
++ * and 'rdataset'.
++ */
++static inline isc_result_t
++fromdname(dns_rdataset_t *rdataset, dns_name_t *lastcname,
++	  unsigned int nlabels, const dns_name_t *qname)
++{
++	dns_fixedname_t fixed;
++	isc_result_t result;
++	dns_name_t *target;
++
++	dns_fixedname_init(&fixed);
++	target = dns_fixedname_name(&fixed);
++	result = dname_target(rdataset, lastcname, nlabels, target);
++	if (result != ISC_R_SUCCESS || !dns_name_equal(qname, target))
++		return (ISC_R_NOTFOUND);
++
++	return (ISC_R_SUCCESS);
++}
++
+ static isc_boolean_t
+ is_answeraddress_allowed(dns_view_t *view, dns_name_t *name,
+ 			 dns_rdataset_t *rdataset)
+@@ -6039,12 +6062,12 @@ answer_response(fetchctx_t *fctx) {
+ 	isc_result_t result;
+ 	dns_message_t *message;
+ 	dns_name_t *name, *dname = NULL, *qname, tname, *ns_name;
+-	dns_name_t *cname = NULL;
++	dns_name_t *cname = NULL, *lastcname = NULL;
+ 	dns_rdataset_t *rdataset, *ns_rdataset;
+-	isc_boolean_t done, external, chaining, aa, found, want_chaining;
++	isc_boolean_t done, external, aa, found, want_chaining;
+ 	isc_boolean_t have_answer, found_cname, found_dname, found_type;
+ 	isc_boolean_t wanted_chaining;
+-	unsigned int aflag;
++	unsigned int aflag, chaining;
+ 	dns_rdatatype_t type;
+ 	dns_fixedname_t fdname, fqname;
+ 	dns_view_t *view;
+@@ -6062,9 +6085,9 @@ answer_response(fetchctx_t *fctx) {
+ 	found_cname = ISC_FALSE;
+ 	found_dname = ISC_FALSE;
+ 	found_type = ISC_FALSE;
+-	chaining = ISC_FALSE;
+ 	have_answer = ISC_FALSE;
+ 	want_chaining = ISC_FALSE;
++	chaining = 0;
+ 	POST(want_chaining);
+ 	if ((message->flags & DNS_MESSAGEFLAG_AA) != 0)
+ 		aa = ISC_TRUE;
+@@ -6075,14 +6098,15 @@ answer_response(fetchctx_t *fctx) {
+ 	view = fctx->res->view;
+ 	result = dns_message_firstname(message, DNS_SECTION_ANSWER);
+ 	while (!done && result == ISC_R_SUCCESS) {
+-		dns_namereln_t namereln;
+-		int order;
+-		unsigned int nlabels;
++		dns_namereln_t namereln, lastreln;
++		int order, lastorder;
++		unsigned int nlabels, lastnlabels;
+ 
+ 		name = NULL;
+ 		dns_message_currentname(message, DNS_SECTION_ANSWER, &name);
+ 		external = ISC_TF(!dns_name_issubdomain(name, &fctx->domain));
+ 		namereln = dns_name_fullcompare(qname, name, &order, &nlabels);
++
+ 		if (namereln == dns_namereln_equal) {
+ 			wanted_chaining = ISC_FALSE;
+ 			for (rdataset = ISC_LIST_HEAD(name->list);
+@@ -6188,6 +6212,7 @@ answer_response(fetchctx_t *fctx) {
+ 							&fctx->domain)) {
+ 						return (DNS_R_SERVFAIL);
+ 					}
++					lastcname = name;
+ 				} else if (rdataset->type == dns_rdatatype_rrsig
+ 					   && rdataset->covers ==
+ 					   dns_rdatatype_cname
+@@ -6211,7 +6236,7 @@ answer_response(fetchctx_t *fctx) {
+ 					rdataset->attributes |=
+ 						DNS_RDATASETATTR_CACHE;
+ 					rdataset->trust = dns_trust_answer;
+-					if (!chaining) {
++					if (chaining == 0) {
+ 						/*
+ 						 * This data is "the" answer
+ 						 * to our question only if
+@@ -6288,10 +6313,21 @@ answer_response(fetchctx_t *fctx) {
+ 			 * cause us to ignore the signatures of
+ 			 * CNAMEs.
+ 			 */
+-			if (wanted_chaining)
+-				chaining = ISC_TRUE;
++			if (wanted_chaining && chaining < 2U)
++				chaining++;
+ 		} else {
+ 			dns_rdataset_t *dnameset = NULL;
++			isc_boolean_t synthcname = ISC_FALSE;
++
++			if (lastcname != NULL) {
++				lastreln = dns_name_fullcompare(lastcname,
++								name,
++								&lastorder,
++								&lastnlabels);
++				if (lastreln == dns_namereln_subdomain &&
++				    lastnlabels == dns_name_countlabels(name))
++					synthcname = ISC_TRUE;
++			}
+ 
+ 			/*
+ 			 * Look for a DNAME (or its SIG).  Anything else is
+@@ -6320,7 +6356,7 @@ answer_response(fetchctx_t *fctx) {
+ 				 * If we're not chaining, then the DNAME and
+ 				 * its signature should not be external.
+ 				 */
+-				if (!chaining && external) {
++				if (chaining == 0 && external) {
+ 					char qbuf[DNS_NAME_FORMATSIZE];
+ 					char obuf[DNS_NAME_FORMATSIZE];
+ 
+@@ -6338,16 +6374,9 @@ answer_response(fetchctx_t *fctx) {
+ 				/*
+ 				 * If DNAME + synthetic CNAME then the
+ 				 * namereln is dns_namereln_subdomain.
+-				 *
+-				 * If synthetic CNAME + DNAME then the
+-				 * namereln is dns_namereln_commonancestor
+-				 * and the number of label must match the
+-				 * DNAME.  This order is not RFC compliant.
+ 				 */
+-
+ 				if (namereln != dns_namereln_subdomain &&
+-				    (namereln != dns_namereln_commonancestor ||
+-				     nlabels != dns_name_countlabels(name)))
++				    !synthcname)
+ 				{
+ 					char qbuf[DNS_NAME_FORMATSIZE];
+ 					char obuf[DNS_NAME_FORMATSIZE];
+@@ -6367,8 +6396,19 @@ answer_response(fetchctx_t *fctx) {
+ 					want_chaining = ISC_TRUE;
+ 					POST(want_chaining);
+ 					aflag = DNS_RDATASETATTR_ANSWER;
+-					result = dname_target(rdataset, qname,
+-							      nlabels, &fdname);
++					dns_fixedname_init(&fdname);
++					dname = dns_fixedname_name(&fdname);
++					if (synthcname) {
++						result = fromdname(rdataset,
++								   lastcname,
++								   lastnlabels,
++								   qname);
++					} else {
++						result = dname_target(rdataset,
++								      qname,
++								      nlabels,
++								      dname);
++					}
+ 					if (result == ISC_R_NOSPACE) {
+ 						/*
+ 						 * We can't construct the
+@@ -6382,8 +6422,8 @@ answer_response(fetchctx_t *fctx) {
+ 					else
+ 						dnameset = rdataset;
+ 
+-					dname = dns_fixedname_name(&fdname);
+-					if (!is_answertarget_allowed(view,
++					if (!synthcname &&
++					    !is_answertarget_allowed(view,
+ 						     qname, rdataset->type,
+ 						     dname, &fctx->domain))
+ 					{
+@@ -6404,7 +6444,13 @@ answer_response(fetchctx_t *fctx) {
+ 				name->attributes |= DNS_NAMEATTR_CACHE;
+ 				rdataset->attributes |= DNS_RDATASETATTR_CACHE;
+ 				rdataset->trust = dns_trust_answer;
+-				if (!chaining) {
++				/*
++				 * If we are not chaining or the first CNAME
++				 * is a synthesised CNAME before the DNAME.
++				 */
++				if ((chaining == 0) ||
++				    (chaining == 1U && synthcname))
++				{
+ 					/*
+ 					 * This data is "the" answer to
+ 					 * our question only if we're
+@@ -6414,9 +6460,12 @@ answer_response(fetchctx_t *fctx) {
+ 					if (aflag == DNS_RDATASETATTR_ANSWER) {
+ 						have_answer = ISC_TRUE;
+ 						found_dname = ISC_TRUE;
+-						if (cname != NULL)
++						if (cname != NULL &&
++						    synthcname)
++						{
+ 							cname->attributes &=
+ 							   ~DNS_NAMEATTR_ANSWER;
++						}
+ 						name->attributes |=
+ 							DNS_NAMEATTR_ANSWER;
+ 					}
+@@ -6434,26 +6483,35 @@ answer_response(fetchctx_t *fctx) {
+ 			 * DNAME chaining.
+ 			 */
+ 			if (dnameset != NULL) {
+-				/*
+-				 * Copy the dname into the qname fixed name.
+-				 *
+-				 * Although we check for failure of the copy
+-				 * operation, in practice it should never fail
+-				 * since we already know that the  result fits
+-				 * in a fixedname.
+-				 */
+-				dns_fixedname_init(&fqname);
+-				qname = dns_fixedname_name(&fqname);
+-				result = dns_name_copy(dname, qname, NULL);
+-				if (result != ISC_R_SUCCESS)
+-					return (result);
++				if (!synthcname) {
++					/*
++					 * Copy the dname into the qname fixed
++					 * name.
++					 *
++					 * Although we check for failure of the
++					 * copy operation, in practice it
++					 * should never fail since we already
++					 * know that the result fits in a
++					 * fixedname.
++					 */
++					dns_fixedname_init(&fqname);
++					qname = dns_fixedname_name(&fqname);
++					result = dns_name_copy(dname, qname,
++							       NULL);
++					if (result != ISC_R_SUCCESS)
++						return (result);
++				}
+ 				wanted_chaining = ISC_TRUE;
+ 				name->attributes |= DNS_NAMEATTR_CHAINING;
+ 				dnameset->attributes |=
+ 					    DNS_RDATASETATTR_CHAINING;
+ 			}
+-			if (wanted_chaining)
+-				chaining = ISC_TRUE;
++			/*
++			 * Ensure that we can't ever get chaining == 1
++			 * above if we have processed a DNAME.
++			 */
++			if (wanted_chaining && chaining < 2U)
++				chaining += 2;
+ 		}
+ 		result = dns_message_nextname(message, DNS_SECTION_ANSWER);
+ 	}
+@@ -6478,7 +6536,7 @@ answer_response(fetchctx_t *fctx) {
+ 	/*
+ 	 * Did chaining end before we got the final answer?
+ 	 */
+-	if (chaining) {
++	if (chaining != 0) {
+ 		/*
+ 		 * Yes.  This may be a negative reply, so hand off
+ 		 * authority section processing to the noanswer code.
+@@ -6527,7 +6585,7 @@ answer_response(fetchctx_t *fctx) {
+ 						DNS_NAMEATTR_CACHE;
+ 					rdataset->attributes |=
+ 						DNS_RDATASETATTR_CACHE;
+-					if (aa && !chaining)
++					if (aa && chaining == 0)
+ 						rdataset->trust =
+ 						    dns_trust_authauthority;
+ 					else
+-- 
+2.9.3
+

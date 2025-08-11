@@ -1,0 +1,195 @@
+From a200b2dd994cbb4ff29151ff46342268bc8fb3c2 Mon Sep 17 00:00:00 2001
+From: Evan Hunt <each@isc.org>
+Date: Mon, 11 Sep 2017 10:34:10 -0700
+Subject: [PATCH 2/2] dig: retain domain when retrying with tcp
+
+4712.	[bug]		"dig +domain" and "dig +search" didn't retain the
+			search domain when retrying with TCP. [RT #45547]
+
+(cherry picked from commit 8e014c45ae75a3ca893cec6a0711beb69ecd18a4)
+(cherry picked from commit 88e2cefcc2e8f48c0fba97661ff79c2506b52b23)
+(cherry picked from commit 51b00c6c783ccf5dca86119ff8f4f8b994298ca4)
+
+Modified to pass with libidn
+
+Fix origin test
+---
+ bin/dig/dighost.c                     | 13 ++++-------
+ bin/tests/system/ans.pl               | 43 +++++++++++++++++++++++++----------
+ bin/tests/system/digdelv/ans4/startme |  0
+ bin/tests/system/digdelv/tests.sh     | 23 ++++++++++++++++++-
+ 4 files changed, 58 insertions(+), 21 deletions(-)
+ create mode 100644 bin/tests/system/digdelv/ans4/startme
+
+diff --git a/bin/dig/dighost.c b/bin/dig/dighost.c
+index 5c03d95..3a066c6 100644
+--- a/bin/dig/dighost.c
++++ b/bin/dig/dighost.c
+@@ -887,6 +887,7 @@ clone_lookup(dig_lookup_t *lookold, isc_boolean_t servers) {
+ 	looknew->section_answer = lookold->section_answer;
+ 	looknew->section_authority = lookold->section_authority;
+ 	looknew->section_additional = lookold->section_additional;
++	looknew->origin = lookold->origin;
+ 	looknew->retries = lookold->retries;
+ 	looknew->tsigctx = NULL;
+ 	looknew->need_search = lookold->need_search;
+@@ -2134,6 +2135,7 @@ setup_lookup(dig_lookup_t *lookup) {
+ 
+ #ifdef WITH_IDN
+ 	if (lookup->origin != NULL) {
++		debug("trying origin %s", lookup->origin->origin);
+ 		mr = idn_encodename(IDN_LOCALCONV | IDN_DELIMMAP,
+ 				    lookup->origin->origin, utf8_origin,
+ 				    sizeof(utf8_origin));
+@@ -2148,6 +2150,7 @@ setup_lookup(dig_lookup_t *lookup) {
+ 	idn_check_result(mr, "convert UTF-8 textname to IDN encoding");
+ #elif defined (WITH_LIBIDN)
+ 	if (lookup->origin != NULL) {
++		debug("trying origin %s", lookup->origin->origin);
+ 		result = libidn_locale_to_utf8 (lookup->origin->origin, utf8_str);
+ 		check_result (result, "convert origin to UTF-8");
+ 		if (len > 0 && utf8_name[len - 1] != '.') {
+@@ -3409,7 +3407,6 @@ recv_done(isc_task_t *task, isc_event_t *event) {
+ 		printf(";; Truncated, retrying in TCP mode.\n");
+ 		n = requeue_lookup(l, ISC_TRUE);
+ 		n->tcp_mode = ISC_TRUE;
+-		n->origin = query->lookup->origin;
+ 		dns_message_destroy(&msg);
+ 		isc_event_free(&event);
+ 		clear_query(query);
+diff --git a/bin/tests/system/ans.pl b/bin/tests/system/ans.pl
+index d6ff3c2..d8c9f9d 100644
+--- a/bin/tests/system/ans.pl
++++ b/bin/tests/system/ans.pl
+@@ -35,7 +35,12 @@
+ #
+ # There can be any number of patterns, each associated
+ # with any number of response RRs.  Each pattern is a
+-# Perl regular expression.
++# Perl regular expression.  If an empty pattern ("//") is
++# received, the server will ignore all incoming queries (TCP
++# connections will still be accepted, but both UDP queries
++# and TCP queries will not be responded to).  If a non-empty
++# pattern is then received over the same control connection,
++# default behavior is restored.
+ #
+ # Each incoming query is converted into a string of the form
+ # "qname qtype" (the printable query domain name, space,
+@@ -105,6 +110,9 @@ $SIG{TERM} = \&rmpid;
+ 
+ #my @answers = ();
+ my @rules;
++my $udphandler;
++my $tcphandler;
++
+ sub handleUDP {
+ 	my ($buf) = @_;
+ 	my $request;
+@@ -414,8 +422,15 @@ for (;;) {
+ 		while (my $line = $conn->getline) {
+ 			chomp $line;
+ 			if ($line =~ m!^/(.*)/$!) {
+-				$rule = { pattern => $1, answer => [] };
+-				push(@rules, $rule);
++				if (length($1) == 0) {
++					$udphandler = sub { return; };
++					$tcphandler = sub { return; };
++				} else {
++					$udphandler = \&handleUDP;
++					$tcphandler = \&handleTCP;
++					$rule = { pattern => $1, answer => [] };
++					push(@rules, $rule);
++				}
+ 			} else {
+ 				push(@{$rule->{answer}},
+ 				     new Net::DNS::RR($line));
+@@ -430,9 +445,11 @@ for (;;) {
+ 		printf "UDP request\n";
+ 		my $buf;
+ 		$udpsock->recv($buf, 512);
+-		my $result = handleUDP($buf);
+-		my $num_chars = $udpsock->send($result);
+-		print "  Sent $num_chars bytes via UDP\n";	
++		my $result = &$udphandler($buf);
++		if (defined($result)) {
++			my $num_chars = $udpsock->send($result);
++			print "  Sent $num_chars bytes via UDP\n";
++		}
+ 	} elsif (vec($rout, fileno($tcpsock), 1)) {
+ 		my $conn = $tcpsock->accept;
+ 		my $buf;
+@@ -444,12 +461,14 @@ for (;;) {
+ 			$n = $conn->sysread($buf, $len);
+ 			last unless $n == $len;
+ 			print "TCP request\n";
+-			my $result = handleTCP($buf);
+-			foreach my $response (@$result) {
+-				$len = length($response);
+-				$n = $conn->syswrite(pack("n", $len), 2);
+-				$n = $conn->syswrite($response, $len);
+-				print "    Sent: $n chars via TCP\n";
++			my $result = &$tcphandler($buf);
++			if (defined($result)) {
++				foreach my $response (@$result) {
++					$len = length($response);
++					$n = $conn->syswrite(pack("n", $len), 2);
++					$n = $conn->syswrite($response, $len);
++					print "    Sent: $n chars via TCP\n";
++				}
+ 			}
+ 		}
+ 		$conn->close;
+diff --git a/bin/tests/system/digdelv/ans4/startme b/bin/tests/system/digdelv/ans4/startme
+new file mode 100644
+index 0000000..e69de29
+diff --git a/bin/tests/system/digdelv/tests.sh b/bin/tests/system/digdelv/tests.sh
+index 988bd52..a19256c 100644
+--- a/bin/tests/system/digdelv/tests.sh
++++ b/bin/tests/system/digdelv/tests.sh
+@@ -19,6 +19,7 @@ status=0
+ n=0
+ # using dig insecure mode as not testing dnssec here
+ DIGOPTS="-i -p 5300"
++SENDCMD="$PERL $SYSTEMTESTTOP/send.pl 10.53.0.4 5301"
+ 
+ if [ -x ${DIG} ] ; then
+   n=`expr $n + 1`
+@@ -62,6 +63,24 @@ if [ -x ${DIG} ] ; then
+   if [ $ret != 0 ]; then echo "I:failed"; fi
+   status=`expr $status + $ret`
+ 
++  n=`expr $n + 1`
++  echo "I:checking dig preserves origin on TCP retries ($n)"
++  ret=0
++  # Ask ans4 to still accept TCP connections, but not respond to queries
++  echo "//" | $SENDCMD
++  $DIG $DIGOPTS -d +tcp @10.53.0.4 +retry=1 +time=1 +domain=bar foo > dig.out.test$n 2>&1 && ret=1
++  l=`grep "trying origin bar" dig.out.test$n | wc -l`
++  [ ${l:-0} -eq 2 ] || ret=1
++  if grep "libidn_locale_to_utf8" dig.out.test$n > /dev/null
++    then
++      # libidn patch uses always using root origin, but print also name
++      grep '^foo\.$' < dig.out.test$n > /dev/null && ret=1
++    else
++      grep "using root origin" < dig.out.test$n > /dev/null && ret=1
++  fi
++  if [ $ret != 0 ]; then echo "I:failed"; fi
++  status=`expr $status + $ret`
++
+ else
+   echo "W:$DIG is needed, so skipping these dig tests"
+ fi
+@@ -131,7 +150,9 @@ if [ -n "${DELV}" -a -x "${DELV}" ] ; then
+   if [ $ret != 0 ]; then echo "I:failed"; fi
+   status=`expr $status + $ret`
+ 
+-  exit $status
+ else
+   echo "W:${DELV:-delv} is not available, so skipping these delv tests"
+ fi
++
++echo "I:exit status: $status"
++[ $status -eq 0 ] || exit 1
+-- 
+2.9.5
+

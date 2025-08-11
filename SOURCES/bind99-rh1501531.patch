@@ -1,0 +1,1961 @@
+From 85938345f9da377e903de0e99b36eaa2a98d99c7 Mon Sep 17 00:00:00 2001
+From: Evan Hunt <each@isc.org>
+Date: Wed, 13 Mar 2013 17:53:11 -0700
+Subject: [PATCH] algorithm flexibility for rndc
+
+3525.	[func]		Support for additional signing algorithms in rndc:
+			hmac-sha1, -sha224, -sha256, -sha384, and -sha512.
+			The -A option to rndc-confgen can be used to
+			select the algorithm for the generated key.
+			(The default is still hmac-md5; this may
+			change in a future release.) [RT #20363]
+---
+ bin/confgen/rndc-confgen.c                        |  27 +-
+ bin/confgen/rndc-confgen.docbook                  |  18 +-
+ bin/named/controlconf.c                           |  22 +-
+ bin/rndc/rndc.c                                   |  38 ++-
+ bin/rndc/rndc.conf                                |   4 +-
+ bin/rndc/rndc.conf.docbook                        |  16 +-
+ bin/rndc/rndc.docbook                             |  14 +-
+ bin/tests/system/autosign/ns1/named.conf          |   2 +-
+ bin/tests/system/autosign/ns2/named.conf          |   2 +-
+ bin/tests/system/autosign/ns3/named.conf          |   2 +-
+ bin/tests/system/cacheclean/ns2/named.conf        |   2 +-
+ bin/tests/system/common/controls.conf             |   2 +-
+ bin/tests/system/common/rndc.conf                 |   2 +-
+ bin/tests/system/common/rndc.key                  |   2 +-
+ bin/tests/system/conf.sh.in                       |   1 +
+ bin/tests/system/database/ns1/named.conf1         |   2 +-
+ bin/tests/system/database/ns1/named.conf2         |   2 +-
+ bin/tests/system/dlv/ns5/named.conf               |   4 +-
+ bin/tests/system/dlv/ns5/rndc.conf                |   2 +-
+ bin/tests/system/dlvauto/ns2/named.conf           |   2 +-
+ bin/tests/system/dlzexternal/ns1/named.conf.in    |   2 +-
+ bin/tests/system/dnssec/ns3/named.conf            |   2 +-
+ bin/tests/system/dnssec/ns4/named1.conf           |   2 +-
+ bin/tests/system/dnssec/ns4/named2.conf           |   2 +-
+ bin/tests/system/dnssec/ns4/named3.conf           |   2 +-
+ bin/tests/system/geoip/ns2/named1.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named10.conf           |   2 +-
+ bin/tests/system/geoip/ns2/named11.conf           |   2 +-
+ bin/tests/system/geoip/ns2/named2.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named3.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named4.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named5.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named6.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named7.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named8.conf            |   2 +-
+ bin/tests/system/geoip/ns2/named9.conf            |   2 +-
+ bin/tests/system/ixfr/ns3/named.conf              |   2 +-
+ bin/tests/system/ixfr/ns4/named.conf              |   2 +-
+ bin/tests/system/ixfr/setup.sh                    |   2 +-
+ bin/tests/system/logfileconfig/ns1/named.dirconf  |   2 +-
+ bin/tests/system/logfileconfig/ns1/named.pipeconf |   2 +-
+ bin/tests/system/logfileconfig/ns1/named.plain    |   2 +-
+ bin/tests/system/logfileconfig/ns1/named.symconf  |   2 +-
+ bin/tests/system/logfileconfig/ns1/rndc.conf      |   2 +-
+ bin/tests/system/nsupdate/ns1/named.conf          |   2 +-
+ bin/tests/system/pkcs11/ns1/named.conf            |   2 +-
+ bin/tests/system/resolver/ns4/named.conf          |   2 +-
+ bin/tests/system/rndc/clean.sh                    |   2 +
+ bin/tests/system/rndc/ns2/named.conf              |   4 +-
+ bin/tests/system/rndc/ns2/secondkey.conf          |   2 +-
+ bin/tests/system/rndc/ns3/named.conf              |   4 +-
+ bin/tests/system/rndc/ns4/3bf305731dd26307.nta    |   3 +
+ bin/tests/system/rndc/ns4/named.conf.in           |  28 +++
+ bin/tests/system/rndc/setup.sh                    |  24 +-
+ bin/tests/system/rndc/tests.sh                    |  60 +++++
+ bin/tests/system/rpz/ns3/named.conf               |   2 +-
+ bin/tests/system/rpz/ns5/named.conf               |   2 +-
+ bin/tests/system/rrl/ns2/named.conf               |   2 +-
+ bin/tests/system/staticstub/ns3/named.conf.in     |   2 +-
+ bin/tests/system/stress/ns3/named.conf            |   2 +-
+ bin/tests/system/tkey/ns1/named.conf.in           |   2 +-
+ bin/tests/system/tsiggss/ns1/named.conf           |   2 +-
+ bin/tests/system/views/ns3/named1.conf            |   2 +-
+ bin/tests/system/views/ns3/named2.conf            |   2 +-
+ bin/tests/system/xfer/ns3/named.conf              |   2 +-
+ bin/tests/system/xfer/ns4/named.conf.base         |   2 +-
+ lib/isccc/cc.c                                    | 289 ++++++++++++++++++----
+ lib/isccc/include/isccc/cc.h                      |  26 +-
+ 68 files changed, 526 insertions(+), 158 deletions(-)
+ create mode 100644 bin/tests/system/rndc/ns4/3bf305731dd26307.nta
+ create mode 100644 bin/tests/system/rndc/ns4/named.conf.in
+
+diff --git a/bin/confgen/rndc-confgen.c b/bin/confgen/rndc-confgen.c
+index e2ac079..3fd54fe 100644
+--- a/bin/confgen/rndc-confgen.c
++++ b/bin/confgen/rndc-confgen.c
+@@ -57,7 +57,6 @@
+ #include "util.h"
+ #include "keygen.h"
+ 
+-#define DEFAULT_KEYLENGTH	128		/*% Bits. */
+ #define DEFAULT_KEYNAME		"rndc-key"
+ #define DEFAULT_SERVER		"127.0.0.1"
+ #define DEFAULT_PORT		953
+@@ -80,7 +79,8 @@ Usage:\n\
+  %s [-a] [-b bits] [-c keyfile] [-k keyname] [-p port] [-r randomfile] \
+ [-s addr] [-t chrootdir] [-u user]\n\
+   -a:		 generate just the key clause and write it to keyfile (%s)\n\
+-  -b bits:	 from 1 through 512, default %d; total length of the secret\n\
++  -A alg:	 algorithm (default hmac-md5)\n\
++  -b bits:	 from 1 through 512, default 256; total length of the secret\n\
+   -c keyfile:	 specify an alternate key file (requires -a)\n\
+   -k keyname:	 the name as it will be used  in named.conf and rndc.conf\n\
+   -p port:	 the port named will listen on and rndc will connect to\n\
+@@ -88,7 +88,7 @@ Usage:\n\
+   -s addr:	 the address to which rndc should connect\n\
+   -t chrootdir:	 write a keyfile in chrootdir as well (requires -a)\n\
+   -u user:	 set the keyfile owner to \"user\" (requires -a)\n",
+-		 progname, keydef, DEFAULT_KEYLENGTH);
++		 progname, keydef);
+ 
+ 	exit (status);
+ }
+@@ -103,12 +103,12 @@ main(int argc, char **argv) {
+ 	const char *keyname = NULL;
+ 	const char *randomfile = NULL;
+ 	const char *serveraddr = NULL;
+-	dns_secalg_t alg = DST_ALG_HMACMD5;
+-	const char *algname = alg_totext(alg);
++	dns_secalg_t alg;
++	const char *algname;
+ 	char *p;
+ 	int ch;
+ 	int port;
+-	int keysize;
++	int keysize = -1;
+ 	struct in_addr addr4_dummy;
+ 	struct in6_addr addr6_dummy;
+ 	char *chrootdir = NULL;
+@@ -124,18 +124,25 @@ main(int argc, char **argv) {
+ 	progname = program;
+ 
+ 	keyname = DEFAULT_KEYNAME;
+-	keysize = DEFAULT_KEYLENGTH;
++	alg = DST_ALG_HMACMD5;
+ 	serveraddr = DEFAULT_SERVER;
+ 	port = DEFAULT_PORT;
+ 
+ 	isc_commandline_errprint = ISC_FALSE;
+ 
+ 	while ((ch = isc_commandline_parse(argc, argv,
+-					   "ab:c:hk:Mmp:r:s:t:u:Vy")) != -1) {
++					   "aA:b:c:hk:Mmp:r:s:t:u:Vy")) != -1)
++	{
+ 		switch (ch) {
+ 		case 'a':
+ 			keyonly = ISC_TRUE;
+ 			break;
++		case 'A':
++			algname = isc_commandline_argument;
++			alg = alg_fromtext(algname);
++			if (alg == DST_ALG_UNKNOWN)
++				fatal("Unsupported algorithm '%s'", algname);
++			break;
+ 		case 'b':
+ 			keysize = strtol(isc_commandline_argument, &p, 10);
+ 			if (*p != '\0' || keysize < 0)
+@@ -203,6 +210,10 @@ main(int argc, char **argv) {
+ 	if (argc > 0)
+ 		usage(1);
+ 
++	if (keysize < 0)
++		keysize = alg_bits(alg);
++	algname = alg_totext(alg);
++
+ 	DO("create memory context", isc_mem_create(0, 0, &mctx));
+ 	isc_buffer_init(&key_txtbuffer, &key_txtsecret, sizeof(key_txtsecret));
+ 
+diff --git a/bin/confgen/rndc-confgen.docbook b/bin/confgen/rndc-confgen.docbook
+index af2cc43..f367b94 100644
+--- a/bin/confgen/rndc-confgen.docbook
++++ b/bin/confgen/rndc-confgen.docbook
+@@ -1,6 +1,6 @@
+ <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+                "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
+-	       [<!ENTITY mdash "&#8212;">]>
++               [<!ENTITY mdash "&#8212;">]>
+ <!--
+  - Copyright (C) 2004, 2005, 2007, 2009  Internet Systems Consortium, Inc. ("ISC")
+  - Copyright (C) 2001, 2003  Internet Software Consortium.
+@@ -41,6 +41,7 @@
+       <year>2005</year>
+       <year>2007</year>
+       <year>2009</year>
++      <year>2013</year>
+       <holder>Internet Systems Consortium, Inc. ("ISC")</holder>
+     </copyright>
+     <copyright>
+@@ -54,6 +55,7 @@
+     <cmdsynopsis>
+       <command>rndc-confgen</command>
+       <arg><option>-a</option></arg>
++      <arg><option>-A <replaceable class="parameter">algorithm</replaceable></option></arg>
+       <arg><option>-b <replaceable class="parameter">keysize</replaceable></option></arg>
+       <arg><option>-c <replaceable class="parameter">keyfile</replaceable></option></arg>
+       <arg><option>-h</option></arg>
+@@ -129,11 +131,23 @@
+       </varlistentry>
+ 
+       <varlistentry>
++        <term>-A <replaceable class="parameter">algorithm</replaceable></term>
++        <listitem>
++          <para>
++            Specifies the algorithm to use for the TSIG key.  Available
++            choices are: hmac-md5, hmac-sha1, hmac-sha224, hmac-sha256,
++            hmac-sha384 and hmac-sha512.  The default is hmac-md5.
++          </para>
++        </listitem>
++      </varlistentry>
++
++      <varlistentry>
+         <term>-b <replaceable class="parameter">keysize</replaceable></term>
+         <listitem>
+           <para>
+             Specifies the size of the authentication key in bits.
+-            Must be between 1 and 512 bits; the default is 128.
++            Must be between 1 and 512 bits; the default is the
++            hash size.
+           </para>
+         </listitem>
+       </varlistentry>
+diff --git a/bin/named/controlconf.c b/bin/named/controlconf.c
+index ef32790..b4176c9 100644
+--- a/bin/named/controlconf.c
++++ b/bin/named/controlconf.c
+@@ -71,6 +71,7 @@ typedef ISC_LIST(controllistener_t) controllistenerlist_t;
+ 
+ struct controlkey {
+ 	char *				keyname;
++	isc_uint32_t			algorithm;
+ 	isc_region_t			secret;
+ 	ISC_LINK(controlkey_t)		link;
+ };
+@@ -325,6 +326,7 @@ control_recvmessage(isc_task_t *task, isc_event_t *event) {
+ 	isccc_sexpr_t *request = NULL;
+ 	isccc_sexpr_t *response = NULL;
+ 	isccc_region_t ccregion;
++	isc_uint32_t algorithm;
+ 	isccc_region_t secret;
+ 	isc_stdtime_t now;
+ 	isc_buffer_t b;
+@@ -343,6 +345,7 @@ control_recvmessage(isc_task_t *task, isc_event_t *event) {
+ 
+ 	conn = event->ev_arg;
+ 	listener = conn->listener;
++	algorithm = DST_ALG_UNKNOWN;
+ 	secret.rstart = NULL;
+ 
+ 	/* Is the server shutting down? */
+@@ -369,7 +372,9 @@ control_recvmessage(isc_task_t *task, isc_event_t *event) {
+ 			goto cleanup;
+ 		memcpy(secret.rstart, key->secret.base, key->secret.length);
+ 		secret.rend = secret.rstart + key->secret.length;
+-		result = isccc_cc_fromwire(&ccregion, &request, &secret);
++		algorithm = key->algorithm;
++		result = isccc_cc_fromwire(&ccregion, &request,
++					   algorithm, &secret);
+ 		if (result == ISC_R_SUCCESS)
+ 			break;
+ 		isc_mem_put(listener->mctx, secret.rstart, REGION_SIZE(secret));
+@@ -480,7 +485,7 @@ control_recvmessage(isc_task_t *task, isc_event_t *event) {
+ 
+ 	ccregion.rstart = conn->buffer + 4;
+ 	ccregion.rend = conn->buffer + sizeof(conn->buffer);
+-	result = isccc_cc_towire(response, &ccregion, &secret);
++	result = isccc_cc_towire(response, &ccregion, algorithm, &secret);
+ 	if (result != ISC_R_SUCCESS)
+ 		goto cleanup_response;
+ 	isc_buffer_init(&b, conn->buffer, 4);
+@@ -693,6 +698,7 @@ controlkeylist_fromcfg(const cfg_obj_t *keylist, isc_mem_t *mctx,
+ 		if (key == NULL)
+ 			goto cleanup;
+ 		key->keyname = newstr;
++		key->algorithm = DST_ALG_UNKNOWN;
+ 		key->secret.base = NULL;
+ 		key->secret.length = 0;
+ 		ISC_LINK_INIT(key, link);
+@@ -737,6 +743,7 @@ register_keys(const cfg_obj_t *control, const cfg_obj_t *keylist,
+ 			const cfg_obj_t *secretobj = NULL;
+ 			const char *algstr = NULL;
+ 			const char *secretstr = NULL;
++			unsigned int algtype;
+ 
+ 			(void)cfg_map_get(keydef, "algorithm", &algobj);
+ 			(void)cfg_map_get(keydef, "secret", &secretobj);
+@@ -745,8 +752,8 @@ register_keys(const cfg_obj_t *control, const cfg_obj_t *keylist,
+ 			algstr = cfg_obj_asstring(algobj);
+ 			secretstr = cfg_obj_asstring(secretobj);
+ 
+-			if (ns_config_getkeyalgorithm(algstr, NULL, NULL) !=
+-			    ISC_R_SUCCESS)
++			if (ns_config_getkeyalgorithm2(algstr, NULL,
++					&algtype, NULL) != ISC_R_SUCCESS)
+ 			{
+ 				cfg_obj_log(control, ns_g_lctx,
+ 					    ISC_LOG_WARNING,
+@@ -759,6 +766,7 @@ register_keys(const cfg_obj_t *control, const cfg_obj_t *keylist,
+ 				continue;
+ 			}
+ 
++			keyid->algorithm = algtype;
+ 			isc_buffer_init(&b, secret, sizeof(secret));
+ 			result = isc_base64_decodestring(secretstr, &b);
+ 
+@@ -809,6 +817,7 @@ get_rndckey(isc_mem_t *mctx, controlkeylist_t *keyids) {
+ 	const char *secretstr = NULL;
+ 	controlkey_t *keyid = NULL;
+ 	char secret[1024];
++	unsigned int algtype;
+ 	isc_buffer_t b;
+ 
+ 	CHECK(cfg_parser_create(mctx, ns_g_lctx, &pctx));
+@@ -822,6 +831,7 @@ get_rndckey(isc_mem_t *mctx, controlkeylist_t *keyids) {
+ 					cfg_obj_asstring(cfg_map_getname(key)));
+ 	keyid->secret.base = NULL;
+ 	keyid->secret.length = 0;
++	keyid->algorithm = DST_ALG_UNKNOWN;
+ 	ISC_LINK_INIT(keyid, link);
+ 	if (keyid->keyname == NULL)
+ 		CHECK(ISC_R_NOMEMORY);
+@@ -835,7 +845,8 @@ get_rndckey(isc_mem_t *mctx, controlkeylist_t *keyids) {
+ 	algstr = cfg_obj_asstring(algobj);
+ 	secretstr = cfg_obj_asstring(secretobj);
+ 
+-	if (ns_config_getkeyalgorithm(algstr, NULL, NULL) != ISC_R_SUCCESS) {
++	if (ns_config_getkeyalgorithm2(algstr, NULL,
++				       &algtype, NULL) != ISC_R_SUCCESS) {
+ 		cfg_obj_log(key, ns_g_lctx,
+ 			    ISC_LOG_WARNING,
+ 			    "unsupported algorithm '%s' in "
+@@ -845,6 +856,7 @@ get_rndckey(isc_mem_t *mctx, controlkeylist_t *keyids) {
+ 		goto cleanup;
+ 	}
+ 
++	keyid->algorithm = algtype;
+ 	isc_buffer_init(&b, secret, sizeof(secret));
+ 	result = isc_base64_decodestring(secretstr, &b);
+ 
+diff --git a/bin/rndc/rndc.c b/bin/rndc/rndc.c
+index be198b1..c67223b 100644
+--- a/bin/rndc/rndc.c
++++ b/bin/rndc/rndc.c
+@@ -77,6 +77,7 @@ static unsigned int remoteport = 0;
+ static isc_socketmgr_t *socketmgr = NULL;
+ static unsigned char databuf[2048];
+ static isccc_ccmsg_t ccmsg;
++static isc_uint32_t algorithm;
+ static isccc_region_t secret;
+ static isc_boolean_t failed = ISC_FALSE;
+ static isc_boolean_t c_flag = ISC_FALSE;
+@@ -250,7 +251,8 @@ rndc_recvdone(isc_task_t *task, isc_event_t *event) {
+ 	source.rstart = isc_buffer_base(&ccmsg.buffer);
+ 	source.rend = isc_buffer_used(&ccmsg.buffer);
+ 
+-	DO("parse message", isccc_cc_fromwire(&source, &response, &secret));
++	DO("parse message",
++	   isccc_cc_fromwire(&source, &response, algorithm, &secret));
+ 
+ 	data = isccc_alist_lookup(response, "_data");
+ 	if (!isccc_alist_alistp(data))
+@@ -305,7 +307,8 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
+ 		      "* the remote server is using an older version of"
+ 		      " the command protocol,\n"
+ 		      "* this host is not authorized to connect,\n"
+-		      "* the clocks are not synchronized, or\n"
++		      "* the clocks are not synchronized,\n"
++		      "* the the key signing algorithm is incorrect, or\n"
+ 		      "* the key is invalid.");
+ 
+ 	if (ccmsg.result != ISC_R_SUCCESS)
+@@ -314,7 +317,8 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
+ 	source.rstart = isc_buffer_base(&ccmsg.buffer);
+ 	source.rend = isc_buffer_used(&ccmsg.buffer);
+ 
+-	DO("parse message", isccc_cc_fromwire(&source, &response, &secret));
++	DO("parse message",
++	   isccc_cc_fromwire(&source, &response, algorithm, &secret));
+ 
+ 	_ctrl = isccc_alist_lookup(response, "_ctrl");
+ 	if (!isccc_alist_alistp(_ctrl))
+@@ -341,7 +345,8 @@ rndc_recvnonce(isc_task_t *task, isc_event_t *event) {
+ 	}
+ 	message.rstart = databuf + 4;
+ 	message.rend = databuf + sizeof(databuf);
+-	DO("render message", isccc_cc_towire(request, &message, &secret));
++	DO("render message",
++	   isccc_cc_towire(request, &message, algorithm, &secret));
+ 	len = sizeof(databuf) - REGION_SIZE(message);
+ 	isc_buffer_init(&b, databuf, 4);
+ 	isc_buffer_putuint32(&b, len - 4);
+@@ -403,7 +408,8 @@ rndc_connected(isc_task_t *task, isc_event_t *event) {
+ 		fatal("out of memory");
+ 	message.rstart = databuf + 4;
+ 	message.rend = databuf + sizeof(databuf);
+-	DO("render message", isccc_cc_towire(request, &message, &secret));
++	DO("render message",
++	   isccc_cc_towire(request, &message, algorithm, &secret));
+ 	len = sizeof(databuf) - REGION_SIZE(message);
+ 	isc_buffer_init(&b, databuf, 4);
+ 	isc_buffer_putuint32(&b, len - 4);
+@@ -483,7 +489,7 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
+ 	const cfg_obj_t *address = NULL;
+ 	const cfg_listelt_t *elt;
+ 	const char *secretstr;
+-	const char *algorithm;
++	const char *algorithmstr;
+ 	static char secretarray[1024];
+ 	const cfg_type_t *conftype = &cfg_type_rndcconf;
+ 	isc_boolean_t key_only = ISC_FALSE;
+@@ -587,10 +593,22 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
+ 		fatal("key must have algorithm and secret");
+ 
+ 	secretstr = cfg_obj_asstring(secretobj);
+-	algorithm = cfg_obj_asstring(algorithmobj);
+-
+-	if (strcasecmp(algorithm, "hmac-md5") != 0)
+-		fatal("unsupported algorithm: %s", algorithm);
++	algorithmstr = cfg_obj_asstring(algorithmobj);
++
++	if (strcasecmp(algorithmstr, "hmac-md5") == 0)
++		algorithm = ISCCC_ALG_HMACMD5;
++	else if (strcasecmp(algorithmstr, "hmac-sha1") == 0)
++		algorithm = ISCCC_ALG_HMACSHA1;
++	else if (strcasecmp(algorithmstr, "hmac-sha224") == 0)
++		algorithm = ISCCC_ALG_HMACSHA224;
++	else if (strcasecmp(algorithmstr, "hmac-sha256") == 0)
++		algorithm = ISCCC_ALG_HMACSHA256;
++	else if (strcasecmp(algorithmstr, "hmac-sha384") == 0)
++		algorithm = ISCCC_ALG_HMACSHA384;
++	else if (strcasecmp(algorithmstr, "hmac-sha512") == 0)
++		algorithm = ISCCC_ALG_HMACSHA512;
++	else
++		fatal("unsupported algorithm: %s", algorithmstr);
+ 
+ 	secret.rstart = (unsigned char *)secretarray;
+ 	secret.rend = (unsigned char *)secretarray + sizeof(secretarray);
+diff --git a/bin/rndc/rndc.conf b/bin/rndc/rndc.conf
+index 67542b9..c463b96 100644
+--- a/bin/rndc/rndc.conf
++++ b/bin/rndc/rndc.conf
+@@ -31,7 +31,7 @@ server localhost {
+ };
+ 
+ key "cc64b3d1db63fc88d7cb5d2f9f57d258" {
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ 	secret "34f88008d07deabbe65bd01f1d233d47";
+ };
+ 
+@@ -42,6 +42,6 @@ server "test1" {
+ };
+ 
+ key "key" {
+-        algorithm       hmac-md5;
++        algorithm       hmac-sha256;
+         secret "c3Ryb25nIGVub3VnaCBmb3IgYSBtYW4gYnV0IG1hZGUgZm9yIGEgd29tYW4K";
+ };
+diff --git a/bin/rndc/rndc.conf.docbook b/bin/rndc/rndc.conf.docbook
+index 9de1995..5753378 100644
+--- a/bin/rndc/rndc.conf.docbook
++++ b/bin/rndc/rndc.conf.docbook
+@@ -40,6 +40,7 @@
+       <year>2004</year>
+       <year>2005</year>
+       <year>2007</year>
++      <year>2013</year>
+       <holder>Internet Systems Consortium, Inc. ("ISC")</holder>
+     </copyright>
+     <copyright>
+@@ -119,11 +120,12 @@
+     <para>
+       The <option>key</option> statement begins with an identifying
+       string, the name of the key.  The statement has two clauses.
+-      <option>algorithm</option> identifies the encryption algorithm
++      <option>algorithm</option> identifies the authentication algorithm
+       for <command>rndc</command> to use; currently only HMAC-MD5
+-      is
++      (for compatibility), HMAC-SHA1, HMAC-SHA224, HMAC-SHA256
++      (default), HMAC-SHA384 and HMAC-SHA512 are
+       supported.  This is followed by a secret clause which contains
+-      the base-64 encoding of the algorithm's encryption key.  The
++      the base-64 encoding of the algorithm's authentication key.  The
+       base-64 string is enclosed in double quotes.
+     </para>
+     <para>
+@@ -166,14 +168,14 @@
+     </para>
+     <para><programlisting>
+       key samplekey {
+-        algorithm       hmac-md5;
++        algorithm       hmac-sha256;
+         secret          "6FMfj43Osz4lyb24OIe2iGEz9lf1llJO+lz";
+       };
+ </programlisting>
+     </para>
+     <para><programlisting>
+       key testkey {
+-        algorithm	hmac-md5;
++        algorithm	hmac-sha256;
+         secret		"R3HI8P6BKw9ZwXwN3VZKuQ==";
+       };
+     </programlisting>
+@@ -186,8 +188,8 @@
+       Commands to the localhost server will use the samplekey key, which
+       must also be defined in the server's configuration file with the
+       same name and secret.  The key statement indicates that samplekey
+-      uses the HMAC-MD5 algorithm and its secret clause contains the
+-      base-64 encoding of the HMAC-MD5 secret enclosed in double quotes.
++      uses the HMAC-SHA256 algorithm and its secret clause contains the
++      base-64 encoding of the HMAC-SHA256 secret enclosed in double quotes.
+     </para>
+     <para>
+       If <command>rndc -s testserver</command> is used then <command>rndc</command> will
+diff --git a/bin/rndc/rndc.docbook b/bin/rndc/rndc.docbook
+index 27645b5..5f97749 100644
+--- a/bin/rndc/rndc.docbook
++++ b/bin/rndc/rndc.docbook
+@@ -76,12 +76,14 @@
+       arguments.
+     </para>
+     <para><command>rndc</command>
+-      communicates with the name server
+-      over a TCP connection, sending commands authenticated with
+-      digital signatures.  In the current versions of
++      communicates with the name server over a TCP connection, sending
++      commands authenticated with digital signatures.  In the current
++      versions of
+       <command>rndc</command> and <command>named</command>,
+-      the only supported authentication algorithm is HMAC-MD5,
+-      which uses a shared secret on each end of the connection.
++      the only supported authentication algorithms are HMAC-MD5
++      (for compatibility), HMAC-SHA1, HMAC-SHA224, HMAC-SHA256
++      (default), HMAC-SHA384 and HMAC-SHA512.
++      They use a shared secret on each end of the connection.
+       This provides TSIG-style authentication for the command
+       request and the name server's response.  All commands sent
+       over the channel must be signed by a key_id known to the
+@@ -145,7 +147,7 @@
+             <command>rndc</command>.  If no server is supplied on the
+             command line, the host named by the default-server clause
+             in the options statement of the <command>rndc</command>
+-	    configuration file will be used.
++            configuration file will be used.
+           </para>
+         </listitem>
+       </varlistentry>
+diff --git a/bin/tests/system/autosign/ns1/named.conf b/bin/tests/system/autosign/ns1/named.conf
+index 2fbe62f..e67c4e4 100644
+--- a/bin/tests/system/autosign/ns1/named.conf
++++ b/bin/tests/system/autosign/ns1/named.conf
+@@ -36,7 +36,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/autosign/ns2/named.conf b/bin/tests/system/autosign/ns2/named.conf
+index 5e9ad8f..826bb91 100644
+--- a/bin/tests/system/autosign/ns2/named.conf
++++ b/bin/tests/system/autosign/ns2/named.conf
+@@ -37,7 +37,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/autosign/ns3/named.conf b/bin/tests/system/autosign/ns3/named.conf
+index 542a81e..89b7ece 100644
+--- a/bin/tests/system/autosign/ns3/named.conf
++++ b/bin/tests/system/autosign/ns3/named.conf
+@@ -39,7 +39,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/cacheclean/ns2/named.conf b/bin/tests/system/cacheclean/ns2/named.conf
+index cb675d2..6f0fba0 100644
+--- a/bin/tests/system/cacheclean/ns2/named.conf
++++ b/bin/tests/system/cacheclean/ns2/named.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/common/controls.conf b/bin/tests/system/common/controls.conf
+index b5d619e..b9b6311 100644
+--- a/bin/tests/system/common/controls.conf
++++ b/bin/tests/system/common/controls.conf
+@@ -19,7 +19,7 @@
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/common/rndc.conf b/bin/tests/system/common/rndc.conf
+index 3704ae7..5661b26 100644
+--- a/bin/tests/system/common/rndc.conf
++++ b/bin/tests/system/common/rndc.conf
+@@ -22,6 +22,6 @@ options {
+ };
+ 
+ key rndc_key {
+-        algorithm       hmac-md5;
++        algorithm       hmac-sha256;
+         secret          "1234abcd8765";
+ };
+diff --git a/bin/tests/system/common/rndc.key b/bin/tests/system/common/rndc.key
+index 1239e93..d5a7a9f 100644
+--- a/bin/tests/system/common/rndc.key
++++ b/bin/tests/system/common/rndc.key
+@@ -18,5 +18,5 @@
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+diff --git a/bin/tests/system/conf.sh.in b/bin/tests/system/conf.sh.in
+index 49c5686..2bd42f9 100644
+--- a/bin/tests/system/conf.sh.in
++++ b/bin/tests/system/conf.sh.in
+@@ -36,6 +36,7 @@ DIG=$TOP/bin/dig/dig
+ RNDC=$TOP/bin/rndc/rndc
+ NSUPDATE=$TOP/bin/nsupdate/nsupdate
+ DDNSCONFGEN=$TOP/bin/confgen/ddns-confgen
++RNDCCONFGEN=$TOP/bin/confgen/rndc-confgen
+ KEYGEN=$TOP/bin/dnssec/dnssec-keygen
+ KEYFRLAB=$TOP/bin/dnssec/dnssec-keyfromlabel
+ SIGNER=$TOP/bin/dnssec/dnssec-signzone
+diff --git a/bin/tests/system/database/ns1/named.conf1 b/bin/tests/system/database/ns1/named.conf1
+index 08dedc8..9270d56 100644
+--- a/bin/tests/system/database/ns1/named.conf1
++++ b/bin/tests/system/database/ns1/named.conf1
+@@ -20,7 +20,7 @@
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/database/ns1/named.conf2 b/bin/tests/system/database/ns1/named.conf2
+index c79bf9b..ed1bdfb 100644
+--- a/bin/tests/system/database/ns1/named.conf2
++++ b/bin/tests/system/database/ns1/named.conf2
+@@ -20,7 +20,7 @@
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/dlv/ns5/named.conf b/bin/tests/system/dlv/ns5/named.conf
+index d886331..954fb37 100644
+--- a/bin/tests/system/dlv/ns5/named.conf
++++ b/bin/tests/system/dlv/ns5/named.conf
+@@ -23,7 +23,7 @@
+  *
+  * e.g.
+  *	key "cc64b3d1db63fc88d7cb5d2f9f57d258" {
+- *		algorithm hmac-md5;
++ *		algorithm hmac-sha256;
+  *		secret "34f88008d07deabbe65bd01f1d233d47";
+  *	}; 
+  *
+@@ -36,7 +36,7 @@
+  */
+ 
+ key "cc64b3d1db63fc88d7cb5d2f9f57d258" {
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ 	secret "34f88008d07deabbe65bd01f1d233d47";
+ };
+ 
+diff --git a/bin/tests/system/dlv/ns5/rndc.conf b/bin/tests/system/dlv/ns5/rndc.conf
+index 958ee98..ecc29b3 100644
+--- a/bin/tests/system/dlv/ns5/rndc.conf
++++ b/bin/tests/system/dlv/ns5/rndc.conf
+@@ -17,7 +17,7 @@
+ /* $Id: rndc.conf,v 1.5 2007/06/19 23:47:02 tbox Exp $ */
+ 
+ key "cc64b3d1db63fc88d7cb5d2f9f57d258" {
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ 	secret "34f88008d07deabbe65bd01f1d233d47";
+ }; 
+  
+diff --git a/bin/tests/system/dlvauto/ns2/named.conf b/bin/tests/system/dlvauto/ns2/named.conf
+index a7b86d0..fce5d85 100644
+--- a/bin/tests/system/dlvauto/ns2/named.conf
++++ b/bin/tests/system/dlvauto/ns2/named.conf
+@@ -37,7 +37,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/dlzexternal/ns1/named.conf.in b/bin/tests/system/dlzexternal/ns1/named.conf.in
+index 6577761..01a4a3b 100644
+--- a/bin/tests/system/dlzexternal/ns1/named.conf.in
++++ b/bin/tests/system/dlzexternal/ns1/named.conf.in
+@@ -33,7 +33,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ include "ddns.key";
+diff --git a/bin/tests/system/dnssec/ns3/named.conf b/bin/tests/system/dnssec/ns3/named.conf
+index 37d23c1..6ef21b3 100644
+--- a/bin/tests/system/dnssec/ns3/named.conf
++++ b/bin/tests/system/dnssec/ns3/named.conf
+@@ -38,7 +38,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/dnssec/ns4/named1.conf b/bin/tests/system/dnssec/ns4/named1.conf
+index 432d3f6..542266f 100644
+--- a/bin/tests/system/dnssec/ns4/named1.conf
++++ b/bin/tests/system/dnssec/ns4/named1.conf
+@@ -47,7 +47,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/dnssec/ns4/named2.conf b/bin/tests/system/dnssec/ns4/named2.conf
+index cc395be..f7e812c 100644
+--- a/bin/tests/system/dnssec/ns4/named2.conf
++++ b/bin/tests/system/dnssec/ns4/named2.conf
+@@ -37,7 +37,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/dnssec/ns4/named3.conf b/bin/tests/system/dnssec/ns4/named3.conf
+index 2d40740..d391aac 100644
+--- a/bin/tests/system/dnssec/ns4/named3.conf
++++ b/bin/tests/system/dnssec/ns4/named3.conf
+@@ -38,7 +38,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named1.conf b/bin/tests/system/geoip/ns2/named1.conf
+index 66aca6f..e4c8eca 100644
+--- a/bin/tests/system/geoip/ns2/named1.conf
++++ b/bin/tests/system/geoip/ns2/named1.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named10.conf b/bin/tests/system/geoip/ns2/named10.conf
+index 2dd52ae..6f3fdee 100644
+--- a/bin/tests/system/geoip/ns2/named10.conf
++++ b/bin/tests/system/geoip/ns2/named10.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named11.conf b/bin/tests/system/geoip/ns2/named11.conf
+index af87edf..149e19a 100644
+--- a/bin/tests/system/geoip/ns2/named11.conf
++++ b/bin/tests/system/geoip/ns2/named11.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named2.conf b/bin/tests/system/geoip/ns2/named2.conf
+index 67a5155..5dc3848 100644
+--- a/bin/tests/system/geoip/ns2/named2.conf
++++ b/bin/tests/system/geoip/ns2/named2.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named3.conf b/bin/tests/system/geoip/ns2/named3.conf
+index 65113a6..ebf96a9 100644
+--- a/bin/tests/system/geoip/ns2/named3.conf
++++ b/bin/tests/system/geoip/ns2/named3.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named4.conf b/bin/tests/system/geoip/ns2/named4.conf
+index d2393d5..cc79dde 100644
+--- a/bin/tests/system/geoip/ns2/named4.conf
++++ b/bin/tests/system/geoip/ns2/named4.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named5.conf b/bin/tests/system/geoip/ns2/named5.conf
+index 011e310..acbbdb1 100644
+--- a/bin/tests/system/geoip/ns2/named5.conf
++++ b/bin/tests/system/geoip/ns2/named5.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named6.conf b/bin/tests/system/geoip/ns2/named6.conf
+index 7ef7b19..5e93510 100644
+--- a/bin/tests/system/geoip/ns2/named6.conf
++++ b/bin/tests/system/geoip/ns2/named6.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named7.conf b/bin/tests/system/geoip/ns2/named7.conf
+index 118bdbe..508a650 100644
+--- a/bin/tests/system/geoip/ns2/named7.conf
++++ b/bin/tests/system/geoip/ns2/named7.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named8.conf b/bin/tests/system/geoip/ns2/named8.conf
+index 9cb5c0a..60dcef2 100644
+--- a/bin/tests/system/geoip/ns2/named8.conf
++++ b/bin/tests/system/geoip/ns2/named8.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/geoip/ns2/named9.conf b/bin/tests/system/geoip/ns2/named9.conf
+index af2f7ff..605b1ff 100644
+--- a/bin/tests/system/geoip/ns2/named9.conf
++++ b/bin/tests/system/geoip/ns2/named9.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/ixfr/ns3/named.conf b/bin/tests/system/ixfr/ns3/named.conf
+index c01ce54..b164968 100644
+--- a/bin/tests/system/ixfr/ns3/named.conf
++++ b/bin/tests/system/ixfr/ns3/named.conf
+@@ -31,7 +31,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/ixfr/ns4/named.conf b/bin/tests/system/ixfr/ns4/named.conf
+index b8c8e8c..073d1a9 100644
+--- a/bin/tests/system/ixfr/ns4/named.conf
++++ b/bin/tests/system/ixfr/ns4/named.conf
+@@ -30,7 +30,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/ixfr/setup.sh b/bin/tests/system/ixfr/setup.sh
+index 7e68ebc..9b3b96d 100644
+--- a/bin/tests/system/ixfr/setup.sh
++++ b/bin/tests/system/ixfr/setup.sh
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/logfileconfig/ns1/named.dirconf b/bin/tests/system/logfileconfig/ns1/named.dirconf
+index 9cbd039..3621c2f 100644
+--- a/bin/tests/system/logfileconfig/ns1/named.dirconf
++++ b/bin/tests/system/logfileconfig/ns1/named.dirconf
+@@ -46,7 +46,7 @@ controls {
+ };
+ 
+ key "rndc-key" {
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+         secret "Am9vCg==";
+ };
+ 
+diff --git a/bin/tests/system/logfileconfig/ns1/named.pipeconf b/bin/tests/system/logfileconfig/ns1/named.pipeconf
+index bf5d02f..94c10f4 100644
+--- a/bin/tests/system/logfileconfig/ns1/named.pipeconf
++++ b/bin/tests/system/logfileconfig/ns1/named.pipeconf
+@@ -46,7 +46,7 @@ controls {
+ };
+ 
+ key "rndc-key" {
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+         secret "Am9vCg==";
+ };
+ 
+diff --git a/bin/tests/system/logfileconfig/ns1/named.plain b/bin/tests/system/logfileconfig/ns1/named.plain
+index 64cfbfa..a404577 100644
+--- a/bin/tests/system/logfileconfig/ns1/named.plain
++++ b/bin/tests/system/logfileconfig/ns1/named.plain
+@@ -46,7 +46,7 @@ controls {
+ };
+ 
+ key "rndc-key" {
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+         secret "Am9vCg==";
+ };
+ 
+diff --git a/bin/tests/system/logfileconfig/ns1/named.symconf b/bin/tests/system/logfileconfig/ns1/named.symconf
+index fc3f9bd..7c42619 100644
+--- a/bin/tests/system/logfileconfig/ns1/named.symconf
++++ b/bin/tests/system/logfileconfig/ns1/named.symconf
+@@ -46,7 +46,7 @@ controls {
+ };
+ 
+ key "rndc-key" {
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+         secret "Am9vCg==";
+ };
+ 
+diff --git a/bin/tests/system/logfileconfig/ns1/rndc.conf b/bin/tests/system/logfileconfig/ns1/rndc.conf
+index f7fe7aa..2f3d0ab 100644
+--- a/bin/tests/system/logfileconfig/ns1/rndc.conf
++++ b/bin/tests/system/logfileconfig/ns1/rndc.conf
+@@ -26,6 +26,6 @@ server localhost {
+ };
+ 
+ key "rndc-key" {
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+         secret "Am9vCg==";
+ };
+diff --git a/bin/tests/system/nsupdate/ns1/named.conf b/bin/tests/system/nsupdate/ns1/named.conf
+index 3492b4c..86fe91d 100644
+--- a/bin/tests/system/nsupdate/ns1/named.conf
++++ b/bin/tests/system/nsupdate/ns1/named.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/pkcs11/ns1/named.conf b/bin/tests/system/pkcs11/ns1/named.conf
+index 48b8adf..0c8bdec 100644
+--- a/bin/tests/system/pkcs11/ns1/named.conf
++++ b/bin/tests/system/pkcs11/ns1/named.conf
+@@ -32,7 +32,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/resolver/ns4/named.conf b/bin/tests/system/resolver/ns4/named.conf
+index 353cfe7..7fe14df 100644
+--- a/bin/tests/system/resolver/ns4/named.conf
++++ b/bin/tests/system/resolver/ns4/named.conf
+@@ -59,7 +59,7 @@ zone "broken" {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/rndc/clean.sh b/bin/tests/system/rndc/clean.sh
+index 2fcfcfb..7e16cb4 100644
+--- a/bin/tests/system/rndc/clean.sh
++++ b/bin/tests/system/rndc/clean.sh
+@@ -22,3 +22,5 @@ rm -f ns2/named.stats
+ rm -f ns3/named_dump.db
+ rm -f ns*/named.memstats
+ rm -f ns*/named.run
++rm -f random.data
++rm -f ns4/*.conf
+diff --git a/bin/tests/system/rndc/ns2/named.conf b/bin/tests/system/rndc/ns2/named.conf
+index 12d6f14..e94bfe9 100644
+--- a/bin/tests/system/rndc/ns2/named.conf
++++ b/bin/tests/system/rndc/ns2/named.conf
+@@ -29,12 +29,12 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ key secondkey {
+ 	secret "abcd1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/rndc/ns2/secondkey.conf b/bin/tests/system/rndc/ns2/secondkey.conf
+index 99a876c..0445299 100644
+--- a/bin/tests/system/rndc/ns2/secondkey.conf
++++ b/bin/tests/system/rndc/ns2/secondkey.conf
+@@ -22,5 +22,5 @@ options {
+ 
+ key secondkey {
+         secret "abcd1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+diff --git a/bin/tests/system/rndc/ns3/named.conf b/bin/tests/system/rndc/ns3/named.conf
+index 9feefac..b8e0780 100644
+--- a/bin/tests/system/rndc/ns3/named.conf
++++ b/bin/tests/system/rndc/ns3/named.conf
+@@ -28,12 +28,12 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ key secondkey {
+ 	secret "abcd1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/rndc/ns4/3bf305731dd26307.nta b/bin/tests/system/rndc/ns4/3bf305731dd26307.nta
+new file mode 100644
+index 0000000..2f5d3cd
+--- /dev/null
++++ b/bin/tests/system/rndc/ns4/3bf305731dd26307.nta
+@@ -0,0 +1,3 @@
++nta1.example. regular 20171113185318
++nta2.example. regular 20171114165318
++nta3.example. regular 20171120165318
+diff --git a/bin/tests/system/rndc/ns4/named.conf.in b/bin/tests/system/rndc/ns4/named.conf.in
+new file mode 100644
+index 0000000..9f926f6
+--- /dev/null
++++ b/bin/tests/system/rndc/ns4/named.conf.in
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2012, 2013  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/* $Id$ */
++
++controls { /* empty */ };
++
++options {
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.4; };
++	listen-on-v6 { none; };
++        recursion no;
++};
++
+diff --git a/bin/tests/system/rndc/setup.sh b/bin/tests/system/rndc/setup.sh
+index aed84af..ce80005 100644
+--- a/bin/tests/system/rndc/setup.sh
++++ b/bin/tests/system/rndc/setup.sh
+@@ -10,14 +10,36 @@
+ # REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ # AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ # INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+-# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGEN
++# -r random.dataCE
+ # OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ # PERFORMANCE OF THIS SOFTWARE.
+ 
+ # $Id: setup.sh,v 1.2 2011/03/21 18:06:06 each Exp $
+ 
++SYSTEMTESTTOP=..
++. $SYSTEMTESTTOP/conf.sh
++
+ sh clean.sh
+ 
++../../../tools/genrandom 400 random.data
++
+ sh ../genzone.sh 2 >ns2/nil.db
+ sh ../genzone.sh 2 >ns2/other.db
+ sh ../genzone.sh 2 >ns2/static.db
++
++cat ns4/named.conf.in > ns4/named.conf
++
++make_key () {
++    $RNDCCONFGEN -r random.data -k key$1 -A $2 -s 10.53.0.4 -p 995${1} \
++            > ns4/key${1}.conf
++    egrep -v '(Start|End|Use|^[^#])' ns4/key$1.conf | cut -c3- | \
++            sed 's/allow { 10.53.0.4/allow { any/' >> ns4/named.conf
++}
++
++make_key 1 hmac-md5
++make_key 2 hmac-sha1
++make_key 3 hmac-sha224
++make_key 4 hmac-sha256
++make_key 5 hmac-sha384
++make_key 6 hmac-sha512
+diff --git a/bin/tests/system/rndc/tests.sh b/bin/tests/system/rndc/tests.sh
+index a558e19..947987b 100644
+--- a/bin/tests/system/rndc/tests.sh
++++ b/bin/tests/system/rndc/tests.sh
+@@ -245,5 +245,65 @@ done
+ if [ $ret != 0 ]; then echo "I:failed"; fi
+ status=`expr $status + $ret`
+ 
++echo "I:testing rndc with hmac-md5"
++ret=0
++$RNDC -s 10.53.0.4 -p 9951 -c ns4/key1.conf status > /dev/null 2>&1 || ret=1
++for i in 2 3 4 5 6
++do
++        $RNDC -s 10.53.0.4 -p 9951 -c ns4/key${i}.conf status > /dev/null 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:testing rndc with hmac-sha1"
++ret=0
++$RNDC -s 10.53.0.4 -p 9952 -c ns4/key2.conf status > /dev/null 2>&1 || ret=1
++for i in 1 3 4 5 6
++do
++        $RNDC -s 10.53.0.4 -p 9952 -c ns4/key${i}.conf status > /dev/null 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:testing rndc with hmac-sha224"
++ret=0
++$RNDC -s 10.53.0.4 -p 9953 -c ns4/key3.conf status > /dev/null 2>&1 || ret=1
++for i in 1 2 4 5 6
++do
++        $RNDC -s 10.53.0.4 -p 9953 -c ns4/key${i}.conf status > /dev/null 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:testing rndc with hmac-sha256"
++ret=0
++$RNDC -s 10.53.0.4 -p 9954 -c ns4/key4.conf status > /dev/null 2>&1 || ret=1
++for i in 1 2 3 5 6
++do
++        $RNDC -s 10.53.0.4 -p 9954 -c ns4/key${i}.conf status > /dev/null 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:testing rndc with hmac-sha384"
++ret=0
++$RNDC -s 10.53.0.4 -p 9955 -c ns4/key5.conf status > /dev/null 2>&1 || ret=1
++for i in 1 2 3 4 6
++do
++        $RNDC -s 10.53.0.4 -p 9955 -c ns4/key${i}.conf status > /dev/null 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:testing rndc with hmac-sha512"
++ret=0
++$RNDC -s 10.53.0.4 -p 9956 -c ns4/key6.conf status > /dev/null 2>&1 || ret=1
++for i in 1 2 3 4 5
++do
++        $RNDC -s 10.53.0.4 -p 9956 -c ns4/key${i}.conf status > /dev/null 2>&1 2>&1 && ret=1
++done
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
+ echo "I:exit status: $status"
+ exit $status
+diff --git a/bin/tests/system/rpz/ns3/named.conf b/bin/tests/system/rpz/ns3/named.conf
+index 4553b97..1e73a88 100644
+--- a/bin/tests/system/rpz/ns3/named.conf
++++ b/bin/tests/system/rpz/ns3/named.conf
+@@ -52,7 +52,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ controls {
+ 	inet 10.53.0.3 port 9953 allow { any; } keys { rndc_key; };
+diff --git a/bin/tests/system/rpz/ns5/named.conf b/bin/tests/system/rpz/ns5/named.conf
+index 82b6fde..df63189 100644
+--- a/bin/tests/system/rpz/ns5/named.conf
++++ b/bin/tests/system/rpz/ns5/named.conf
+@@ -40,7 +40,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ controls {
+ 	inet 10.53.0.5 port 9953 allow { any; } keys { rndc_key; };
+diff --git a/bin/tests/system/rrl/ns2/named.conf b/bin/tests/system/rrl/ns2/named.conf
+index cc261cb..748639c 100644
+--- a/bin/tests/system/rrl/ns2/named.conf
++++ b/bin/tests/system/rrl/ns2/named.conf
+@@ -44,7 +44,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ controls {
+ 	inet 10.53.0.2 port 9953 allow { any; } keys { rndc_key; };
+diff --git a/bin/tests/system/staticstub/ns3/named.conf.in b/bin/tests/system/staticstub/ns3/named.conf.in
+index 159a4be..dbf9b17 100644
+--- a/bin/tests/system/staticstub/ns3/named.conf.in
++++ b/bin/tests/system/staticstub/ns3/named.conf.in
+@@ -32,7 +32,7 @@
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/stress/ns3/named.conf b/bin/tests/system/stress/ns3/named.conf
+index 9ff09d7..f8695bc 100644
+--- a/bin/tests/system/stress/ns3/named.conf
++++ b/bin/tests/system/stress/ns3/named.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/tkey/ns1/named.conf.in b/bin/tests/system/tkey/ns1/named.conf.in
+index b0f1700..6225563 100644
+--- a/bin/tests/system/tkey/ns1/named.conf.in
++++ b/bin/tests/system/tkey/ns1/named.conf.in
+@@ -37,7 +37,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/tsiggss/ns1/named.conf b/bin/tests/system/tsiggss/ns1/named.conf
+index 645d578..3084a1b 100644
+--- a/bin/tests/system/tsiggss/ns1/named.conf
++++ b/bin/tests/system/tsiggss/ns1/named.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/views/ns3/named1.conf b/bin/tests/system/views/ns3/named1.conf
+index 9723e08..8071dbf 100644
+--- a/bin/tests/system/views/ns3/named1.conf
++++ b/bin/tests/system/views/ns3/named1.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/views/ns3/named2.conf b/bin/tests/system/views/ns3/named2.conf
+index 27d4955..2804059 100644
+--- a/bin/tests/system/views/ns3/named2.conf
++++ b/bin/tests/system/views/ns3/named2.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/xfer/ns3/named.conf b/bin/tests/system/xfer/ns3/named.conf
+index 5f742d2..0ea4663 100644
+--- a/bin/tests/system/xfer/ns3/named.conf
++++ b/bin/tests/system/xfer/ns3/named.conf
+@@ -34,7 +34,7 @@ options {
+ 
+ key rndc_key {
+         secret "1234abcd8765";
+-        algorithm hmac-md5;
++        algorithm hmac-sha256;
+ };
+ 
+ controls {
+diff --git a/bin/tests/system/xfer/ns4/named.conf.base b/bin/tests/system/xfer/ns4/named.conf.base
+index 231fcfa..ecab46a 100644
+--- a/bin/tests/system/xfer/ns4/named.conf.base
++++ b/bin/tests/system/xfer/ns4/named.conf.base
+@@ -30,7 +30,7 @@ options {
+ 
+ key rndc_key {
+ 	secret "1234abcd8765";
+-	algorithm hmac-md5;
++	algorithm hmac-sha256;
+ };
+ 
+ key unused_key. {
+diff --git a/lib/isccc/cc.c b/lib/isccc/cc.c
+index 10e5dc9..9428374 100644
+--- a/lib/isccc/cc.c
++++ b/lib/isccc/cc.c
+@@ -41,6 +41,7 @@
+ 
+ #include <isc/assertions.h>
+ #include <isc/hmacmd5.h>
++#include <isc/hmacsha.h>
+ #include <isc/print.h>
+ #include <isc/safe.h>
+ #include <isc/stdlib.h>
+@@ -78,6 +79,34 @@ static unsigned char auth_hmd5[] = {
+ #define HMD5_OFFSET	21		/*%< 21 = 6 + 1 + 4 + 5 + 1 + 4 */
+ #define HMD5_LENGTH	22
+ 
++static unsigned char auth_hsha[] = {
++	0x05, 0x5f, 0x61, 0x75, 0x74, 0x68,		/*%< len + _auth */
++	ISCCC_CCMSGTYPE_TABLE,				/*%< message type */
++	0x00, 0x00, 0x00, 0x63,				/*%< length == 99 */
++	0x04, 0x68, 0x73, 0x68, 0x61,			/*%< len + hsha */
++	ISCCC_CCMSGTYPE_BINARYDATA,			/*%< message type */
++	0x00, 0x00, 0x00, 0x59,				/*%< length == 89 */
++	0x00,						/*%< algorithm */
++	/*
++	 * The base64 encoding of one of our HMAC-SHA* signatures is
++	 * 88 bytes.
++	 */
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
++};
++
++#define HSHA_OFFSET	22		/*%< 21 = 6 + 1 + 4 + 5 + 1 + 4 + 1 */
++#define HSHA_LENGTH	88
++
+ static isc_result_t
+ table_towire(isccc_sexpr_t *alist, isccc_region_t *target);
+ 
+@@ -205,53 +234,133 @@ list_towire(isccc_sexpr_t *list, isccc_region_t *target)
+ }
+ 
+ static isc_result_t
+-sign(unsigned char *data, unsigned int length, unsigned char *hmd5,
+-     isccc_region_t *secret)
++sign(unsigned char *data, unsigned int length, unsigned char *hmac,
++     isc_uint32_t algorithm, isccc_region_t *secret)
+ {
+-	isc_hmacmd5_t ctx;
++	union {
++		isc_hmacmd5_t hmd5;
++		isc_hmacsha1_t hsha;
++		isc_hmacsha224_t h224;
++		isc_hmacsha256_t h256;
++		isc_hmacsha384_t h384;
++		isc_hmacsha512_t h512;
++	} ctx;
+ 	isc_result_t result;
+ 	isccc_region_t source, target;
+-	unsigned char digest[ISC_MD5_DIGESTLENGTH];
+-	unsigned char digestb64[ISC_MD5_DIGESTLENGTH * 4];
++	unsigned char digest[ISC_SHA512_DIGESTLENGTH];
++	unsigned char digestb64[HSHA_LENGTH + 4];
+ 
+-	isc_hmacmd5_init(&ctx, secret->rstart, REGION_SIZE(*secret));
+-	isc_hmacmd5_update(&ctx, data, length);
+-	isc_hmacmd5_sign(&ctx, digest);
+ 	source.rstart = digest;
+-	source.rend = digest + ISC_MD5_DIGESTLENGTH;
++
++	switch (algorithm) {
++	case ISCCC_ALG_HMACMD5:
++		isc_hmacmd5_init(&ctx.hmd5, secret->rstart,
++				 REGION_SIZE(*secret));
++		isc_hmacmd5_update(&ctx.hmd5, data, length);
++		isc_hmacmd5_sign(&ctx.hmd5, digest);
++		source.rend = digest + ISC_MD5_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA1:
++		isc_hmacsha1_init(&ctx.hsha, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha1_update(&ctx.hsha, data, length);
++		isc_hmacsha1_sign(&ctx.hsha, digest,
++				    ISC_SHA1_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA1_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA224:
++		isc_hmacsha224_init(&ctx.h224, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha224_update(&ctx.h224, data, length);
++		isc_hmacsha224_sign(&ctx.h224, digest,
++				    ISC_SHA224_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA224_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA256:
++		isc_hmacsha256_init(&ctx.h256, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha256_update(&ctx.h256, data, length);
++		isc_hmacsha256_sign(&ctx.h256, digest,
++				    ISC_SHA256_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA256_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA384:
++		isc_hmacsha384_init(&ctx.h384, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha384_update(&ctx.h384, data, length);
++		isc_hmacsha384_sign(&ctx.h384, digest,
++				    ISC_SHA384_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA384_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA512:
++		isc_hmacsha512_init(&ctx.h512, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha512_update(&ctx.h512, data, length);
++		isc_hmacsha512_sign(&ctx.h512, digest,
++				    ISC_SHA512_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA512_DIGESTLENGTH;
++		break;
++
++	default:
++		return (ISC_R_FAILURE);
++	}
++
++	memset(digestb64, 0, sizeof(digestb64));
+ 	target.rstart = digestb64;
+-	target.rend = digestb64 + ISC_MD5_DIGESTLENGTH * 4;
++	target.rend = digestb64 + sizeof(digestb64);
+ 	result = isccc_base64_encode(&source, 64, "", &target);
+ 	if (result != ISC_R_SUCCESS)
+ 		return (result);
+-	PUT_MEM(digestb64, HMD5_LENGTH, hmd5);
+-
++	if (algorithm == ISCCC_ALG_HMACMD5)
++		PUT_MEM(digestb64, HMD5_LENGTH, hmac);
++	else
++		PUT_MEM(digestb64, HSHA_LENGTH, hmac);
+ 	return (ISC_R_SUCCESS);
+ }
+ 
+ isc_result_t
+ isccc_cc_towire(isccc_sexpr_t *alist, isccc_region_t *target,
+-	      isccc_region_t *secret)
++		isc_uint32_t algorithm, isccc_region_t *secret)
+ {
+-	unsigned char *hmd5_rstart, *signed_rstart;
++	unsigned char *hmac_rstart, *signed_rstart;
+ 	isc_result_t result;
+ 
+-	if (REGION_SIZE(*target) < 4 + sizeof(auth_hmd5))
+-		return (ISC_R_NOSPACE);
++	if (algorithm == ISCCC_ALG_HMACMD5) {
++		if (REGION_SIZE(*target) < 4 + sizeof(auth_hmd5))
++			return (ISC_R_NOSPACE);
++	} else {
++		if (REGION_SIZE(*target) < 4 + sizeof(auth_hsha))
++			return (ISC_R_NOSPACE);
++	}
++
+ 	/*
+ 	 * Emit protocol version.
+ 	 */
+ 	PUT32(1, target->rstart);
+ 	if (secret != NULL) {
+ 		/*
+-		 * Emit _auth section with zeroed HMAC-MD5 signature.
++		 * Emit _auth section with zeroed HMAC signature.
+ 		 * We'll replace the zeros with the real signature once
+ 		 * we know what it is.
+ 		 */
+-		hmd5_rstart = target->rstart + HMD5_OFFSET;
+-		PUT_MEM(auth_hmd5, sizeof(auth_hmd5), target->rstart);
++		if (algorithm == ISCCC_ALG_HMACMD5) {
++			hmac_rstart = target->rstart + HMD5_OFFSET;
++			PUT_MEM(auth_hmd5, sizeof(auth_hmd5), target->rstart);
++		} else {
++			unsigned char *hmac_alg;
++
++			hmac_rstart = target->rstart + HSHA_OFFSET;
++			hmac_alg = hmac_rstart - 1;
++			PUT_MEM(auth_hsha, sizeof(auth_hsha), target->rstart);
++			PUT8(algorithm, hmac_alg);
++		}
+ 	} else
+-		hmd5_rstart = NULL;
++		hmac_rstart = NULL;
+ 	signed_rstart = target->rstart;
+ 	/*
+ 	 * Delete any existing _auth section so that we don't try
+@@ -266,21 +375,28 @@ isccc_cc_towire(isccc_sexpr_t *alist, isccc_region_t *target,
+ 		return (result);
+ 	if (secret != NULL)
+ 		return (sign(signed_rstart, (target->rstart - signed_rstart),
+-			     hmd5_rstart, secret));
++			     hmac_rstart, algorithm, secret));
+ 	return (ISC_R_SUCCESS);
+ }
+ 
+ static isc_result_t
+ verify(isccc_sexpr_t *alist, unsigned char *data, unsigned int length,
+-       isccc_region_t *secret)
++       isc_uint32_t algorithm, isccc_region_t *secret)
+ {
+-	isc_hmacmd5_t ctx;
++	union {
++		isc_hmacmd5_t hmd5;
++		isc_hmacsha1_t hsha;
++		isc_hmacsha224_t h224;
++		isc_hmacsha256_t h256;
++		isc_hmacsha384_t h384;
++		isc_hmacsha512_t h512;
++	} ctx;
+ 	isccc_region_t source;
+ 	isccc_region_t target;
+ 	isc_result_t result;
+-	isccc_sexpr_t *_auth, *hmd5;
+-	unsigned char digest[ISC_MD5_DIGESTLENGTH];
+-	unsigned char digestb64[ISC_MD5_DIGESTLENGTH * 4];
++	isccc_sexpr_t *_auth, *hmac;
++	unsigned char digest[ISC_SHA512_DIGESTLENGTH];
++	unsigned char digestb64[HSHA_LENGTH * 4];
+ 
+ 	/*
+ 	 * Extract digest.
+@@ -288,40 +404,107 @@ verify(isccc_sexpr_t *alist, unsigned char *data, unsigned int length,
+ 	_auth = isccc_alist_lookup(alist, "_auth");
+ 	if (!isccc_alist_alistp(_auth))
+ 		return (ISC_R_FAILURE);
+-	hmd5 = isccc_alist_lookup(_auth, "hmd5");
+-	if (!isccc_sexpr_binaryp(hmd5))
++	if (algorithm == ISCCC_ALG_HMACMD5)
++		hmac = isccc_alist_lookup(_auth, "hmd5");
++	else
++		hmac = isccc_alist_lookup(_auth, "hsha");
++	if (!isccc_sexpr_binaryp(hmac))
+ 		return (ISC_R_FAILURE);
+ 	/*
+ 	 * Compute digest.
+ 	 */
+-	isc_hmacmd5_init(&ctx, secret->rstart, REGION_SIZE(*secret));
+-	isc_hmacmd5_update(&ctx, data, length);
+-	isc_hmacmd5_sign(&ctx, digest);
+ 	source.rstart = digest;
+-	source.rend = digest + ISC_MD5_DIGESTLENGTH;
+ 	target.rstart = digestb64;
+-	target.rend = digestb64 + ISC_MD5_DIGESTLENGTH * 4;
++	switch (algorithm) {
++	case ISCCC_ALG_HMACMD5:
++		isc_hmacmd5_init(&ctx.hmd5, secret->rstart,
++				 REGION_SIZE(*secret));
++		isc_hmacmd5_update(&ctx.hmd5, data, length);
++		isc_hmacmd5_sign(&ctx.hmd5, digest);
++		source.rend = digest + ISC_MD5_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA1:
++		isc_hmacsha1_init(&ctx.hsha, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha1_update(&ctx.hsha, data, length);
++		isc_hmacsha1_sign(&ctx.hsha, digest,
++				    ISC_SHA1_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA1_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA224:
++		isc_hmacsha224_init(&ctx.h224, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha224_update(&ctx.h224, data, length);
++		isc_hmacsha224_sign(&ctx.h224, digest,
++				    ISC_SHA224_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA224_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA256:
++		isc_hmacsha256_init(&ctx.h256, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha256_update(&ctx.h256, data, length);
++		isc_hmacsha256_sign(&ctx.h256, digest,
++				    ISC_SHA256_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA256_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA384:
++		isc_hmacsha384_init(&ctx.h384, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha384_update(&ctx.h384, data, length);
++		isc_hmacsha384_sign(&ctx.h384, digest,
++				    ISC_SHA384_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA384_DIGESTLENGTH;
++		break;
++
++	case ISCCC_ALG_HMACSHA512:
++		isc_hmacsha512_init(&ctx.h512, secret->rstart,
++				    REGION_SIZE(*secret));
++		isc_hmacsha512_update(&ctx.h512, data, length);
++		isc_hmacsha512_sign(&ctx.h512, digest,
++				    ISC_SHA512_DIGESTLENGTH);
++		source.rend = digest + ISC_SHA512_DIGESTLENGTH;
++		break;
++
++	default:
++		return (ISC_R_FAILURE);
++	}
++	target.rstart = digestb64;
++	target.rend = digestb64 + sizeof(digestb64);
++	memset(digestb64, 0, sizeof(digestb64));
+ 	result = isccc_base64_encode(&source, 64, "", &target);
+ 	if (result != ISC_R_SUCCESS)
+ 		return (result);
+-	/*
+-	 * Strip trailing == and NUL terminate target.
+-	 */
+-	target.rstart -= 2;
+-	*target.rstart++ = '\0';
++
+ 	/*
+ 	 * Verify.
+ 	 */
+-	if (!isc_safe_memcmp((unsigned char *) isccc_sexpr_tostring(hmd5),
+-			     digestb64, HMD5_LENGTH))
+-		return (ISCCC_R_BADAUTH);
++	if (algorithm == ISCCC_ALG_HMACMD5) {
++		unsigned char *value;
++
++		value = (unsigned char *) isccc_sexpr_tostring(hmac);
++		if (memcmp(value, digestb64, HMD5_LENGTH) != 0)
++			return (ISCCC_R_BADAUTH);
++	} else {
++		unsigned char *value;
++		isc_uint32_t valalg;
++
++		value = (unsigned char *) isccc_sexpr_tostring(hmac);
++		GET8(valalg, value);
++		if ((valalg != algorithm) ||
++		    (memcmp(value, digestb64, HSHA_LENGTH) != 0))
++			return (ISCCC_R_BADAUTH);
++	}
+ 
+ 	return (ISC_R_SUCCESS);
+ }
+ 
+ static isc_result_t
+ table_fromwire(isccc_region_t *source, isccc_region_t *secret,
+-	       isccc_sexpr_t **alistp);
++	       isc_uint32_t algorithm, isccc_sexpr_t **alistp);
+ 
+ static isc_result_t
+ list_fromwire(isccc_region_t *source, isccc_sexpr_t **listp);
+@@ -352,7 +535,7 @@ value_fromwire(isccc_region_t *source, isccc_sexpr_t **valuep)
+ 		} else
+ 			result = ISC_R_NOMEMORY;
+ 	} else if (msgtype == ISCCC_CCMSGTYPE_TABLE)
+-		result = table_fromwire(&active, NULL, valuep);
++		result = table_fromwire(&active, NULL, 0, valuep);
+ 	else if (msgtype == ISCCC_CCMSGTYPE_LIST)
+ 		result = list_fromwire(&active, valuep);
+ 	else
+@@ -363,7 +546,7 @@ value_fromwire(isccc_region_t *source, isccc_sexpr_t **valuep)
+ 
+ static isc_result_t
+ table_fromwire(isccc_region_t *source, isccc_region_t *secret,
+-	       isccc_sexpr_t **alistp)
++	       isc_uint32_t algorithm, isccc_sexpr_t **alistp)
+ {
+ 	char key[256];
+ 	isc_uint32_t len;
+@@ -405,7 +588,7 @@ table_fromwire(isccc_region_t *source, isccc_region_t *secret,
+ 		if (checksum_rstart != NULL)
+ 			result = verify(alist, checksum_rstart,
+ 					(source->rend - checksum_rstart),
+-					secret);
++					algorithm, secret);
+ 		else
+ 			result = ISCCC_R_BADAUTH;
+ 	} else
+@@ -448,7 +631,7 @@ list_fromwire(isccc_region_t *source, isccc_sexpr_t **listp)
+ 
+ isc_result_t
+ isccc_cc_fromwire(isccc_region_t *source, isccc_sexpr_t **alistp,
+-		isccc_region_t *secret)
++		  isc_uint32_t algorithm, isccc_region_t *secret)
+ {
+ 	unsigned int size;
+ 	isc_uint32_t version;
+@@ -460,7 +643,7 @@ isccc_cc_fromwire(isccc_region_t *source, isccc_sexpr_t **alistp,
+ 	if (version != 1)
+ 		return (ISCCC_R_UNKNOWNVERSION);
+ 
+-	return (table_fromwire(source, secret, alistp));
++	return (table_fromwire(source, secret, algorithm, alistp));
+ }
+ 
+ static isc_result_t
+@@ -523,8 +706,8 @@ createmessage(isc_uint32_t version, const char *from, const char *to,
+ 
+ isc_result_t
+ isccc_cc_createmessage(isc_uint32_t version, const char *from, const char *to,
+-		     isc_uint32_t serial, isccc_time_t now,
+-		     isccc_time_t expires, isccc_sexpr_t **alistp)
++		       isc_uint32_t serial, isccc_time_t now,
++		       isccc_time_t expires, isccc_sexpr_t **alistp)
+ {
+ 	return (createmessage(version, from, to, serial, now, expires,
+ 			      alistp, ISC_TRUE));
+@@ -532,7 +715,7 @@ isccc_cc_createmessage(isc_uint32_t version, const char *from, const char *to,
+ 
+ isc_result_t
+ isccc_cc_createack(isccc_sexpr_t *message, isc_boolean_t ok,
+-		 isccc_sexpr_t **ackp)
++		   isccc_sexpr_t **ackp)
+ {
+ 	char *_frm, *_to;
+ 	isc_uint32_t serial;
+@@ -610,7 +793,7 @@ isccc_cc_isreply(isccc_sexpr_t *message)
+ 
+ isc_result_t
+ isccc_cc_createresponse(isccc_sexpr_t *message, isccc_time_t now,
+-		      isccc_time_t expires, isccc_sexpr_t **alistp)
++			isccc_time_t expires, isccc_sexpr_t **alistp)
+ {
+ 	char *_frm, *_to, *type = NULL;
+ 	isc_uint32_t serial;
+@@ -720,7 +903,7 @@ isccc_cc_lookupstring(isccc_sexpr_t *alist, const char *key, char **strp)
+ 
+ isc_result_t
+ isccc_cc_lookupuint32(isccc_sexpr_t *alist, const char *key,
+-		       isc_uint32_t *uintp)
++		      isc_uint32_t *uintp)
+ {
+ 	isccc_sexpr_t *kv, *v;
+ 
+@@ -798,7 +981,7 @@ has_whitespace(const char *str)
+ 
+ isc_result_t
+ isccc_cc_checkdup(isccc_symtab_t *symtab, isccc_sexpr_t *message,
+-		isccc_time_t now)
++		  isccc_time_t now)
+ {
+ 	const char *_frm;
+ 	const char *_to;
+diff --git a/lib/isccc/include/isccc/cc.h b/lib/isccc/include/isccc/cc.h
+index 79393be..777e675 100644
+--- a/lib/isccc/include/isccc/cc.h
++++ b/lib/isccc/include/isccc/cc.h
+@@ -41,6 +41,16 @@
+ 
+ ISC_LANG_BEGINDECLS
+ 
++/*% from lib/dns/include/dst/dst.h */
++
++#define ISCCC_ALG_UNKNOWN	0
++#define ISCCC_ALG_HMACMD5	157
++#define ISCCC_ALG_HMACSHA1	161
++#define ISCCC_ALG_HMACSHA224	162
++#define ISCCC_ALG_HMACSHA256	163
++#define ISCCC_ALG_HMACSHA384	164
++#define ISCCC_ALG_HMACSHA512	165
++
+ /*% Maximum Datagram Package */
+ #define ISCCC_CC_MAXDGRAMPACKET		4096
+ 
+@@ -56,23 +66,23 @@ ISC_LANG_BEGINDECLS
+ /*% Send to Wire */
+ isc_result_t
+ isccc_cc_towire(isccc_sexpr_t *alist, isccc_region_t *target,
+-	      isccc_region_t *secret);
++		isc_uint32_t algorithm, isccc_region_t *secret);
+ 
+ /*% Get From Wire */
+ isc_result_t
+ isccc_cc_fromwire(isccc_region_t *source, isccc_sexpr_t **alistp,
+-		isccc_region_t *secret);
++		  isc_uint32_t algorithm, isccc_region_t *secret);
+ 
+ /*% Create Message */
+ isc_result_t
+ isccc_cc_createmessage(isc_uint32_t version, const char *from, const char *to,
+-		     isc_uint32_t serial, isccc_time_t now,
+-		     isccc_time_t expires, isccc_sexpr_t **alistp);
++		       isc_uint32_t serial, isccc_time_t now,
++		       isccc_time_t expires, isccc_sexpr_t **alistp);
+ 
+ /*% Create Acknowledgment */
+ isc_result_t
+ isccc_cc_createack(isccc_sexpr_t *message, isc_boolean_t ok,
+-		 isccc_sexpr_t **ackp);
++		   isccc_sexpr_t **ackp);
+ 
+ /*% Is Ack? */
+ isc_boolean_t
+@@ -85,7 +95,7 @@ isccc_cc_isreply(isccc_sexpr_t *message);
+ /*% Create Response */
+ isc_result_t
+ isccc_cc_createresponse(isccc_sexpr_t *message, isccc_time_t now,
+-		      isccc_time_t expires, isccc_sexpr_t **alistp);
++			isccc_time_t expires, isccc_sexpr_t **alistp);
+ 
+ /*% Define String */
+ isccc_sexpr_t *
+@@ -102,7 +112,7 @@ isccc_cc_lookupstring(isccc_sexpr_t *alist, const char *key, char **strp);
+ /*% Lookup uint 32 */
+ isc_result_t
+ isccc_cc_lookupuint32(isccc_sexpr_t *alist, const char *key,
+-		    isc_uint32_t *uintp);
++		      isc_uint32_t *uintp);
+ 
+ /*% Create Symbol Table */
+ isc_result_t
+@@ -115,7 +125,7 @@ isccc_cc_cleansymtab(isccc_symtab_t *symtab, isccc_time_t now);
+ /*% Check for Duplicates */
+ isc_result_t
+ isccc_cc_checkdup(isccc_symtab_t *symtab, isccc_sexpr_t *message,
+-		   isccc_time_t now);
++		  isccc_time_t now);
+ 
+ ISC_LANG_ENDDECLS
+ 
+-- 
+2.9.5
+

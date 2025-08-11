@@ -1,0 +1,26 @@
+From 23c33ea76e916cc16e354faa218b6a0ca6385d00 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20Men=C5=A1=C3=ADk?= <pemensik@redhat.com>
+Date: Tue, 5 Dec 2017 16:33:08 +0100
+Subject: [PATCH] Fix bug #726120
+
+---
+ bin/dig/dighost.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/bin/dig/dighost.c b/bin/dig/dighost.c
+index 42a2fe2..3a066c6 100644
+--- a/bin/dig/dighost.c
++++ b/bin/dig/dighost.c
+@@ -3416,7 +3416,8 @@ recv_done(isc_task_t *task, isc_event_t *event) {
+ 		return;
+ 	}
+ 	if ((msg->rcode == dns_rcode_servfail && !l->servfail_stops) ||
+-	    (check_ra && (msg->flags & DNS_MESSAGEFLAG_RA) == 0 && l->recurse))
++	    (check_ra && (msg->flags & DNS_MESSAGEFLAG_RA) == 0 &&
++	     msg->rcode != dns_rcode_noerror && l->recurse))
+ 	{
+ 		dig_query_t *next = ISC_LIST_NEXT(query, link);
+ 		if (l->current_query == query)
+-- 
+2.9.5
+
