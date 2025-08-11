@@ -1,0 +1,520 @@
+Applied fix from upstream
+
+From 3994b1f9c2bd4438586523fb2e49b0fb847b487b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@sury.org>
+Date: Wed, 6 Jun 2018 14:51:08 +0200
+Subject: [PATCH] Remove support for obsoleted and insecure DSA and
+ DSA-NSEC3-SHA1 algorithms
+
+---
+ lib/dns-pkcs11/Makefile.in                        | 4 ++--
+ lib/dns-pkcs11/Makefile.in.dist_pkcs11            | 4 ++--
+ lib/dns-pkcs11/Makefile.in.dyndb                  | 4 ++--
+ lib/dns-pkcs11/Makefile.in.native_pkcs11          | 4 ++--
+ lib/dns-pkcs11/Makefile.in.nonexec                | 4 ++--
+ lib/dns-pkcs11/Makefile.in.parallel               | 4 ++--
+ lib/dns-pkcs11/Makefile.in.rh1220594-geoip        | 4 ++--
+ lib/dns/Makefile.in                               | 4 ++--
+ lib/dns/Makefile.in.dyndb                         | 4 ++--
+ lib/dns/Makefile.in.native_pkcs11                 | 4 ++--
+ lib/dns/Makefile.in.nonexec                       | 4 ++--
+ lib/dns/Makefile.in.parallel                      | 4 ++--
+ lib/dns/Makefile.in.rh1220594-geoip               | 4 ++--
+ lib/export/dns-pkcs11/Makefile.in                 | 4 ++--
+ lib/export/dns-pkcs11/Makefile.in.dist_pkcs11     | 4 ++--
+ lib/export/dns-pkcs11/Makefile.in.exportlib       | 4 ++--
+ lib/export/dns-pkcs11/Makefile.in.native_pkcs11   | 4 ++--
+ lib/export/dns-pkcs11/Makefile.in.rh1220594-geoip | 4 ++--
+ lib/export/dns/Makefile.in                        | 4 ++--
+ lib/export/dns/Makefile.in.exportlib              | 4 ++--
+ lib/export/dns/Makefile.in.native_pkcs11          | 4 ++--
+ lib/export/dns/Makefile.in.rh1220594-geoip        | 4 ++--
+ 22 files changed, 44 insertions(+), 44 deletions(-)
+
+diff --git a/lib/dns-pkcs11/Makefile.in b/lib/dns-pkcs11/Makefile.in
+index 1a79768..c9ee4de 100644
+--- a/lib/dns-pkcs11/Makefile.in
++++ b/lib/dns-pkcs11/Makefile.in
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -81,7 +81,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@ @GEOIPLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns-pkcs11/Makefile.in.dist_pkcs11 b/lib/dns-pkcs11/Makefile.in.dist_pkcs11
+index ae316c5..0f48552 100644
+--- a/lib/dns-pkcs11/Makefile.in.dist_pkcs11
++++ b/lib/dns-pkcs11/Makefile.in.dist_pkcs11
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -81,7 +81,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@ @GEOIPLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns-pkcs11/Makefile.in.dyndb b/lib/dns-pkcs11/Makefile.in.dyndb
+index 909250f..5a20f1d 100644
+--- a/lib/dns-pkcs11/Makefile.in.dyndb
++++ b/lib/dns-pkcs11/Makefile.in.dyndb
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -79,7 +79,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns-pkcs11/Makefile.in.native_pkcs11 b/lib/dns-pkcs11/Makefile.in.native_pkcs11
+index 60cbeec..e6b99d3 100644
+--- a/lib/dns-pkcs11/Makefile.in.native_pkcs11
++++ b/lib/dns-pkcs11/Makefile.in.native_pkcs11
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -76,7 +76,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns-pkcs11/Makefile.in.nonexec b/lib/dns-pkcs11/Makefile.in.nonexec
+index a3e3e9a..83431f7 100644
+--- a/lib/dns-pkcs11/Makefile.in.nonexec
++++ b/lib/dns-pkcs11/Makefile.in.nonexec
+@@ -47,7 +47,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -80,7 +80,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns-pkcs11/Makefile.in.parallel b/lib/dns-pkcs11/Makefile.in.parallel
+index e91b503..6f2efbb 100644
+--- a/lib/dns-pkcs11/Makefile.in.parallel
++++ b/lib/dns-pkcs11/Makefile.in.parallel
+@@ -47,7 +47,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -80,7 +80,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns-pkcs11/Makefile.in.rh1220594-geoip b/lib/dns-pkcs11/Makefile.in.rh1220594-geoip
+index 2efcc5a..29002b9 100644
+--- a/lib/dns-pkcs11/Makefile.in.rh1220594-geoip
++++ b/lib/dns-pkcs11/Makefile.in.rh1220594-geoip
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -79,7 +79,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns/Makefile.in b/lib/dns/Makefile.in
+index ae316c5..0f48552 100644
+--- a/lib/dns/Makefile.in
++++ b/lib/dns/Makefile.in
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -81,7 +81,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@ @GEOIPLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns/Makefile.in.dyndb b/lib/dns/Makefile.in.dyndb
+index 909250f..5a20f1d 100644
+--- a/lib/dns/Makefile.in.dyndb
++++ b/lib/dns/Makefile.in.dyndb
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -79,7 +79,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/dns/Makefile.in.native_pkcs11 b/lib/dns/Makefile.in.native_pkcs11
+index 60cbeec..e6b99d3 100644
+--- a/lib/dns/Makefile.in.native_pkcs11
++++ b/lib/dns/Makefile.in.native_pkcs11
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -76,7 +76,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns/Makefile.in.nonexec b/lib/dns/Makefile.in.nonexec
+index a3e3e9a..83431f7 100644
+--- a/lib/dns/Makefile.in.nonexec
++++ b/lib/dns/Makefile.in.nonexec
+@@ -47,7 +47,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -80,7 +80,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns/Makefile.in.parallel b/lib/dns/Makefile.in.parallel
+index e91b503..6f2efbb 100644
+--- a/lib/dns/Makefile.in.parallel
++++ b/lib/dns/Makefile.in.parallel
+@@ -47,7 +47,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -80,7 +80,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@DST_EXTRA_SRCS@ @OPENSSLLINKSRCS@ \
+diff --git a/lib/dns/Makefile.in.rh1220594-geoip b/lib/dns/Makefile.in.rh1220594-geoip
+index 2efcc5a..29002b9 100644
+--- a/lib/dns/Makefile.in.rh1220594-geoip
++++ b/lib/dns/Makefile.in.rh1220594-geoip
+@@ -43,7 +43,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		  opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ \
+ 		  opensslrsa_link.@O@
+ 
+@@ -79,7 +79,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} @RRLLINKOBJS@
+ 
+ # Alphabetically
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		  opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ PKCS11LINKSRCS	= pkcs11dh_link.c pkcs11dsa_link.c pkcs11rsa_link.c \
+diff --git a/lib/export/dns-pkcs11/Makefile.in b/lib/export/dns-pkcs11/Makefile.in
+index 0f8abd3..c35a6f5 100644
+--- a/lib/export/dns-pkcs11/Makefile.in
++++ b/lib/export/dns-pkcs11/Makefile.in
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -74,7 +74,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS} @GEOIPLINKOBJS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns-pkcs11/Makefile.in.dist_pkcs11 b/lib/export/dns-pkcs11/Makefile.in.dist_pkcs11
+index 887acb9..eb34353 100644
+--- a/lib/export/dns-pkcs11/Makefile.in.dist_pkcs11
++++ b/lib/export/dns-pkcs11/Makefile.in.dist_pkcs11
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -74,7 +74,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS} @GEOIPLINKOBJS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns-pkcs11/Makefile.in.exportlib b/lib/export/dns-pkcs11/Makefile.in.exportlib
+index f575f86..db481d8 100644
+--- a/lib/export/dns-pkcs11/Makefile.in.exportlib
++++ b/lib/export/dns-pkcs11/Makefile.in.exportlib
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns-pkcs11/Makefile.in.native_pkcs11 b/lib/export/dns-pkcs11/Makefile.in.native_pkcs11
+index 1e4540f..c656293 100644
+--- a/lib/export/dns-pkcs11/Makefile.in.native_pkcs11
++++ b/lib/export/dns-pkcs11/Makefile.in.native_pkcs11
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns-pkcs11/Makefile.in.rh1220594-geoip b/lib/export/dns-pkcs11/Makefile.in.rh1220594-geoip
+index e10bf59..af2e9f1 100644
+--- a/lib/export/dns-pkcs11/Makefile.in.rh1220594-geoip
++++ b/lib/export/dns-pkcs11/Makefile.in.rh1220594-geoip
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns/Makefile.in b/lib/export/dns/Makefile.in
+index 887acb9..eb34353 100644
+--- a/lib/export/dns/Makefile.in
++++ b/lib/export/dns/Makefile.in
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -74,7 +74,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS} @GEOIPLINKOBJS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns/Makefile.in.exportlib b/lib/export/dns/Makefile.in.exportlib
+index f575f86..db481d8 100644
+--- a/lib/export/dns/Makefile.in.exportlib
++++ b/lib/export/dns/Makefile.in.exportlib
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns/Makefile.in.native_pkcs11 b/lib/export/dns/Makefile.in.native_pkcs11
+index 1e4540f..c656293 100644
+--- a/lib/export/dns/Makefile.in.native_pkcs11
++++ b/lib/export/dns/Makefile.in.native_pkcs11
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+diff --git a/lib/export/dns/Makefile.in.rh1220594-geoip b/lib/export/dns/Makefile.in.rh1220594-geoip
+index e10bf59..af2e9f1 100644
+--- a/lib/export/dns/Makefile.in.rh1220594-geoip
++++ b/lib/export/dns/Makefile.in.rh1220594-geoip
+@@ -44,7 +44,7 @@ LIBS =		@LIBS@
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKOBJS = opensslgost_link.@O@
+-OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ openssldsa_link.@O@ \
++OPENSSLLINKOBJS = openssl_link.@O@ openssldh_link.@O@ \
+ 		opensslecdsa_link.@O@ @OPENSSLGOSTLINKOBJS@ opensslrsa_link.@O@
+ 
+ DSTOBJS =	@OPENSSLLINKOBJS@ \
+@@ -73,7 +73,7 @@ OBJS=		${DNSOBJS} ${OTHEROBJS} ${DSTOBJS} ${PORTDNSOBJS}
+ # Alphabetically
+ 
+ OPENSSLGOSTLINKSRCS = opensslgost_link.c
+-OPENSSLLINKSRCS = openssl_link.c openssldh_link.c openssldsa_link.c \
++OPENSSLLINKSRCS = openssl_link.c openssldh_link.c \
+ 		opensslecdsa_link.c @OPENSSLGOSTLINKSRCS@ opensslrsa_link.c
+ 
+ DSTSRCS =	@OPENSSLLINKSRCS@ \
+-- 
+2.43.2
+
