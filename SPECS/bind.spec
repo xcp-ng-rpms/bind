@@ -30,7 +30,7 @@ Summary:  The Berkeley Internet Name Domain (BIND) DNS (Domain Name System) serv
 Name:     bind
 License:  ISC
 Version:  9.9.4
-Release: %{?xsrel}%{?dist}
+Release: %{?xsrel}.1%{?dist}
 Epoch: 32
 Url:      http://www.isc.org/products/BIND/
 Buildroot:%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -396,92 +396,92 @@ Based on the code from Jan "Yenya" Kasprzak <kas@fi.muni.cz>
 %setup -q -n %{name}-%{VERSION}
 
 # Common patches
-%patch5 -p1 -b .nonexec
-%patch10 -p1 -b .PIE
-%patch16 -p1 -b .redhat_doc
+%patch -P 5 -p1 -b .nonexec
+%patch -P 10 -p1 -b .PIE
+%patch -P 16 -p1 -b .redhat_doc
 %ifnarch alpha ia64
-%patch72 -p1 -b .64bit
+%patch -P 72 -p1 -b .64bit
 %endif
-%patch73 -p1 -b .libidn
-%patch83 -p1 -b .libidn2
-%patch85 -p1 -b .libidn3
-%patch87 -p1 -b .parallel
-%patch94 -p1 -b .rh461409
+%patch -P 73 -p1 -b .libidn
+%patch -P 83 -p1 -b .libidn2
+%patch -P 85 -p1 -b .libidn3
+%patch -P 87 -p1 -b .parallel
+%patch -P 94 -p1 -b .rh461409
 
-%patch102 -p1 -b .rh452060
-%patch106 -p0 -b .rh490837
-%patch109 -p1 -b .rh478718
-%patch110 -p1 -b .rh570851
-%patch111 -p1 -b .exportlib
-%patch112 -p1 -b .rh645544
-%patch119 -p1 -b .rh693982
-%patch123 -p1 -b .rh735103
-%patch124 -p1 -b .rh726120
-%patch127 -p1 -b .forward
-%patch130 -p1 -b .libdb
-%patch131 -p1 -b .multlib-conflict
-%patch137 -p1 -b .rrl
-%patch138 -p1 -b .update
-%patch139 -p1 -b .journal
-%patch140 -p1 -b .send_buffers
-%patch141 -p1 -b .leak_35073
-%patch142 -p1 -b .rbt_crash
-%patch143 -p1 -b .CVE-2014-059
-%patch144 -p1 -b .rh1067424
-%patch145 -p1 -b .rh1072379
-%patch146 -p1 -b .rh1098959
-%patch147 -p1 -b .CVE-2014-8500
-%patch148 -p1 -b .CVE-2015-1349
-%patch149 -p1 -b .rh1215687-limits
+%patch -P 102 -p1 -b .rh452060
+%patch -P 106 -p0 -b .rh490837
+%patch -P 109 -p1 -b .rh478718
+%patch -P 110 -p1 -b .rh570851
+%patch -P 111 -p1 -b .exportlib
+%patch -P 112 -p1 -b .rh645544
+%patch -P 119 -p1 -b .rh693982
+%patch -P 123 -p1 -b .rh735103
+%patch -P 124 -p1 -b .rh726120
+%patch -P 127 -p1 -b .forward
+%patch -P 130 -p1 -b .libdb
+%patch -P 131 -p1 -b .multlib-conflict
+%patch -P 137 -p1 -b .rrl
+%patch -P 138 -p1 -b .update
+%patch -P 139 -p1 -b .journal
+%patch -P 140 -p1 -b .send_buffers
+%patch -P 141 -p1 -b .leak_35073
+%patch -P 142 -p1 -b .rbt_crash
+%patch -P 143 -p1 -b .CVE-2014-059
+%patch -P 144 -p1 -b .rh1067424
+%patch -P 145 -p1 -b .rh1072379
+%patch -P 146 -p1 -b .rh1098959
+%patch -P 147 -p1 -b .CVE-2014-8500
+%patch -P 148 -p1 -b .CVE-2015-1349
+%patch -P 149 -p1 -b .rh1215687-limits
 
-%patch150 -p1 -b .external_key
-%patch151 -p1 -b .native_pkcs11
+%patch -P 150 -p1 -b .external_key
+%patch -P 151 -p1 -b .native_pkcs11
 # http://cov01.lab.eng.brq.redhat.com/covscanhub/waiving/9377/
-%patch153 -p1 -b .coverity_9377
-%patch154 -p1 -b .rh1215164
-%patch155 -p1 -b .nsupdate_realm
-%patch156 -p1 -b .CVE-2015-4620
-%patch157 -p1 -b .CVE-2015-5477
-%patch158 -p1 -b .sock-maxevents
-%patch159 -p1 -b .CVE-2015-5722
-%patch160 -p1 -b .CVE-2015-8000
-%patch161 -p1 -b .CVE-2015-8704
-%patch162 -p1 -b .CVE-2016-1285-CVE-2016-1286
-%patch163 -p1 -b .rh1291185
-%patch164 -p1 -b .rh1259514
-%patch165 -p1 -b .rh1306610-caa
-%patch104 -p1 -b .dyndb
+%patch -P 153 -p1 -b .coverity_9377
+%patch -P 154 -p1 -b .rh1215164
+%patch -P 155 -p1 -b .nsupdate_realm
+%patch -P 156 -p1 -b .CVE-2015-4620
+%patch -P 157 -p1 -b .CVE-2015-5477
+%patch -P 158 -p1 -b .sock-maxevents
+%patch -P 159 -p1 -b .CVE-2015-5722
+%patch -P 160 -p1 -b .CVE-2015-8000
+%patch -P 161 -p1 -b .CVE-2015-8704
+%patch -P 162 -p1 -b .CVE-2016-1285-CVE-2016-1286
+%patch -P 163 -p1 -b .rh1291185
+%patch -P 164 -p1 -b .rh1259514
+%patch -P 165 -p1 -b .rh1306610-caa
+%patch -P 104 -p1 -b .dyndb
 
 # GeoIP support
-%patch166 -p1 -b .rh1220594-geoip
+%patch -P 166 -p1 -b .rh1220594-geoip
 # extract the binary testing data
 tar -xf %{SOURCE48} -C bin/tests/system/geoip/data
 
-%patch167 -p1 -b .rh1294506
-%patch168 -p1 -b .CVE-2016-2776
-%patch169 -p1 -b .CVE-2016-8864
-%patch170 -p1 -b .CVE-2016-9131
-%patch171 -p1 -b .CVE-2016-9147
-%patch172 -p1 -b .CVE-2016-9444
-%patch173 -p1 -b .rt43779
-%patch174 -p1 -b .CVE-2016-2775
-%patch175 -p1 -b .CVE-2017-3135
-%patch176 -p1 -b .rt44318
-%patch177 -p1 -b .rh1392362
-%patch178 -p1 -b .coverity2
-%patch179 -p1 -b .CVE-2017-3136
-%patch180 -p1 -b .CVE-2017-3137
-%patch181 -p1 -b .rh1416304
-%patch182 -p1 -b .CVE-2017-3142+3143
-%patch183 -p1 -b .rh1472862
-%patch184 -p1 -b .rh1476013
-%patch185 -p1 -b .rh1470637-tests
-%patch186 -p1 -b .rh1470637
-%patch187 -p1 -b .rh1464850
-%patch188 -p1 -b .rh1464850
-%patch189 -p1 -b .rh1501531
-%patch190 -p1 -b .CVE-2017-3145
-%patch191 -p1 -b .CVE-2018-5740
+%patch -P 167 -p1 -b .rh1294506
+%patch -P 168 -p1 -b .CVE-2016-2776
+%patch -P 169 -p1 -b .CVE-2016-8864
+%patch -P 170 -p1 -b .CVE-2016-9131
+%patch -P 171 -p1 -b .CVE-2016-9147
+%patch -P 172 -p1 -b .CVE-2016-9444
+%patch -P 173 -p1 -b .rt43779
+%patch -P 174 -p1 -b .CVE-2016-2775
+%patch -P 175 -p1 -b .CVE-2017-3135
+%patch -P 176 -p1 -b .rt44318
+%patch -P 177 -p1 -b .rh1392362
+%patch -P 178 -p1 -b .coverity2
+%patch -P 179 -p1 -b .CVE-2017-3136
+%patch -P 180 -p1 -b .CVE-2017-3137
+%patch -P 181 -p1 -b .rh1416304
+%patch -P 182 -p1 -b .CVE-2017-3142+3143
+%patch -P 183 -p1 -b .rh1472862
+%patch -P 184 -p1 -b .rh1476013
+%patch -P 185 -p1 -b .rh1470637-tests
+%patch -P 186 -p1 -b .rh1470637
+%patch -P 187 -p1 -b .rh1464850
+%patch -P 188 -p1 -b .rh1464850
+%patch -P 189 -p1 -b .rh1501531
+%patch -P 190 -p1 -b .CVE-2017-3145
+%patch -P 191 -p1 -b .CVE-2018-5740
 
 # Override upstream builtin keys
 cp -fp %{SOURCE29} bind.keys
@@ -493,14 +493,14 @@ cp -r lib/isc{,-pkcs11}
 cp -r lib/dns{,-pkcs11}
 cp -r lib/export/isc{,-pkcs11}
 cp -r lib/export/dns{,-pkcs11}
-%patch152 -p1 -b .dist_pkcs11
+%patch -P 152 -p1 -b .dist_pkcs11
 %endif
 
 %if %{SDB}
-%patch101 -p1 -b .old-api
+%patch -P 101 -p1 -b .old-api
 mkdir bin/named-sdb
 cp -r bin/named/* bin/named-sdb
-%patch11 -p1 -b .sdbsrc
+%patch -P 11 -p1 -b .sdbsrc
 # SDB ldap
 cp -fp contrib/sdb/ldap/ldapdb.[ch] bin/named-sdb
 # SDB postgreSQL
@@ -519,17 +519,17 @@ cp -fp %{SOURCE7} bin/sdb_tools/Makefile.in
 cp -fp contrib/sdb/ldap/{zone2ldap.1,zone2ldap.c} bin/sdb_tools
 cp -fp contrib/sdb/pgsql/zonetodb.c bin/sdb_tools
 cp -fp contrib/sdb/sqlite/zone2sqlite.c bin/sdb_tools
-%patch12 -p1 -b .sdb
+%patch -P 12 -p1 -b .sdb
 %endif
 %if %{SDB}
-%patch17 -p1 -b .fix_sdb_ldap
+%patch -P 17 -p1 -b .fix_sdb_ldap
 %endif
 %if %{SDB}
-%patch62 -p1 -b .sdb-sqlite-bld
+%patch -P 62 -p1 -b .sdb-sqlite-bld
 %endif
-%patch133 -p1 -b .rh640538
-%patch134 -p1 -b .rh669163
-%patch135 -p1 -b .libidn4
+%patch -P 133 -p1 -b .rh640538
+%patch -P 134 -p1 -b .rh669163
+%patch -P 135 -p1 -b .libidn4
 
 # Sparc and s390 arches need to use -fPIE
 %ifarch sparcv9 sparc64 s390 s390x
@@ -538,13 +538,13 @@ for i in bin/named{,-sdb}/{,unix}/Makefile.in; do
 done
 %endif
 
-%patch300 -p1
-%patch301 -p1
-%patch302 -p1
-%patch303 -p1
-%patch304 -p1
-%patch305 -p1
-%patch306 -p1
+%patch -P 300 -p1
+%patch -P 301 -p1
+%patch -P 302 -p1
+%patch -P 303 -p1
+%patch -P 304 -p1
+%patch -P 305 -p1
+%patch -P 306 -p1
 
 :;
 
@@ -1178,6 +1178,10 @@ rm -rf ${RPM_BUILD_ROOT}
 %endif
 
 %changelog
+* Tue Jan 20 2026 Philippe Coval <philippe.coval@vates.tech> - 32:9.9.4-63.1
+- Update obsolete patch macro
+- Rebuild for openssl-3
+
 * Thu Jan 02 2025 Deli Zhang <deli.zhang@citrix.com> - 9.9.4-63
 - Add epoch 32
 
