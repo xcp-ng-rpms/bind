@@ -1,0 +1,90 @@
+diff -Naur bind-9.9.4/configure bind-9.9.4.new/configure
+--- bind-9.9.4/configure	2013-09-05 05:09:08.000000000 +0000
++++ bind-9.9.4/configure	2024-09-24 06:40:09.588675000 +0000
+@@ -14137,57 +14137,6 @@
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+ fi
+ 
+-
+-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether linking with OpenSSL requires -ldl" >&5
+-$as_echo_n "checking whether linking with OpenSSL requires -ldl... " >&6; }
+-		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+-/* end confdefs.h.  */
+-
+-#include <openssl/err.h>
+-int
+-main ()
+-{
+- DSO_METHOD_dlfcn();
+-  ;
+-  return 0;
+-}
+-_ACEOF
+-if ac_fn_c_try_link "$LINENO"; then :
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+-$as_echo "no" >&6; }
+-else
+-  LIBS="$LIBS -ldl"
+-		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+-/* end confdefs.h.  */
+-
+-#include <openssl/err.h>
+-
+-int
+-main ()
+-{
+- DSO_METHOD_dlfcn();
+-  ;
+-  return 0;
+-}
+-_ACEOF
+-if ac_fn_c_try_link "$LINENO"; then :
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+-$as_echo "yes" >&6; }
+-		DNS_OPENSSL_LIBS="$DNS_OPENSSL_LIBS -ldl"
+-
+-else
+-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: unknown" >&5
+-$as_echo "unknown" >&6; }
+-		 as_fn_error $? "OpenSSL has unsupported dynamic loading" "$LINENO" 5
+-fi
+-rm -f core conftest.err conftest.$ac_objext \
+-    conftest$ac_exeext conftest.$ac_ext
+-
+-fi
+-rm -f core conftest.err conftest.$ac_objext \
+-    conftest$ac_exeext conftest.$ac_ext
+-
+-# Check whether --enable-openssl-version-check was given.
+ if test "${enable_openssl_version_check+set}" = set; then :
+   enableval=$enable_openssl_version_check;
+ fi
+diff -Naur bind-9.9.4/configure.in bind-9.9.4.new/configure.in
+--- bind-9.9.4/configure.in	2013-09-05 05:09:08.000000000 +0000
++++ bind-9.9.4/configure.in	2024-09-24 07:52:50.346336000 +0000
+@@ -753,25 +753,6 @@
+ shared library configuration (e.g., LD_LIBRARY_PATH).)],
+ 		[AC_MSG_RESULT(assuming it does work on target platform)])
+ 
+-		AC_MSG_CHECKING(whether linking with OpenSSL requires -ldl)
+-		AC_TRY_LINK([
+-#include <openssl/err.h>],
+-[ DSO_METHOD_dlfcn(); ],
+-		[AC_MSG_RESULT(no)],
+-		[LIBS="$LIBS -ldl"
+-		AC_TRY_LINK([
+-#include <openssl/err.h>
+-],[ DSO_METHOD_dlfcn(); ],
+-		[AC_MSG_RESULT(yes)
+-		DNS_OPENSSL_LIBS="$DNS_OPENSSL_LIBS -ldl"
+-		],
+-		 [AC_MSG_RESULT(unknown)
+-		 AC_MSG_ERROR(OpenSSL has unsupported dynamic loading)],
+-		[AC_MSG_RESULT(assuming it does work on target platform)])
+-		],
+-		[AC_MSG_RESULT(assuming it does work on target platform)]
+-		)
+-		
+ AC_ARG_ENABLE(openssl-version-check,
+ [AC_HELP_STRING([--enable-openssl-version-check],
+ 	[Check OpenSSL Version @<:@default=yes@:>@])])

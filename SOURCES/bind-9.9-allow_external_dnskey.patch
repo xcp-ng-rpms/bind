@@ -1,0 +1,1727 @@
+From 0c91911b4d1e872b87eaf6431ed47fe24d18dd43 Mon Sep 17 00:00:00 2001
+From: Mark Andrews <marka@isc.org>
+Date: Wed, 4 Sep 2013 13:53:02 +1000
+Subject: [PATCH] 3642.   [func]          Allow externally generated DNSKEY to
+ be imported                         into the DNSKEY management framework.  A
+ new tool                         dnssec-importkey is used to this. [RT
+ #34698]
+
+---
+ CHANGES                                |   4 +
+ bin/dnssec/.gitignore                  |   1 +
+ bin/dnssec/Makefile.in                 |   8 +-
+ bin/dnssec/dnssec-importkey.8          | 112 +++++++++
+ bin/dnssec/dnssec-importkey.c          | 399 +++++++++++++++++++++++++++++++++
+ bin/dnssec/dnssec-importkey.docbook    | 185 +++++++++++++++
+ bin/dnssec/dnssec-importkey.html       | 112 +++++++++
+ bin/dnssec/dnssec-settime.c            |   4 +-
+ bin/tests/system/conf.sh.in            |   1 +
+ bin/tests/system/inline/clean.sh       |   3 +
+ bin/tests/system/inline/ns1/root.db.in |   3 +
+ bin/tests/system/inline/ns3/named.conf |   8 +
+ bin/tests/system/inline/ns3/sign.sh    |  29 +++
+ bin/tests/system/inline/setup.sh       |   1 +
+ bin/tests/system/inline/tests.sh       |  17 +-
+ lib/dns/dnssec.c                       |  96 ++++----
+ lib/dns/dst_api.c                      |  10 +
+ lib/dns/dst_internal.h                 |   1 +
+ lib/dns/dst_parse.c                    |  63 ++++--
+ lib/dns/dst_result.c                   |   2 +-
+ lib/dns/include/dns/master.h           |   1 +
+ lib/dns/include/dst/dst.h              |   6 +
+ lib/dns/master.c                       |   4 +-
+ lib/dns/openssldsa_link.c              |  19 ++
+ lib/dns/opensslecdsa_link.c            |  53 +++--
+ lib/dns/opensslgost_link.c             |  27 ++-
+ lib/dns/opensslrsa_link.c              |  18 +-
+ lib/dns/zone.c                         |   4 +
+ 28 files changed, 1108 insertions(+), 83 deletions(-)
+ create mode 100644 bin/dnssec/dnssec-importkey.8
+ create mode 100644 bin/dnssec/dnssec-importkey.c
+ create mode 100644 bin/dnssec/dnssec-importkey.docbook
+ create mode 100644 bin/dnssec/dnssec-importkey.html
+
+diff --git a/bin/dnssec/Makefile.in b/bin/dnssec/Makefile.in
+index 4f8bceb..ecb0fae 100644
+--- a/bin/dnssec/Makefile.in
++++ b/bin/dnssec/Makefile.in
+@@ -45,13 +45,13 @@ NOSYMLIBS =	${DNSLIBS} ${ISCNOSYMLIBS} @LIBS@
+ TARGETS =	dnssec-keygen@EXEEXT@ dnssec-signzone@EXEEXT@ \
+ 		dnssec-keyfromlabel@EXEEXT@ dnssec-dsfromkey@EXEEXT@ \
+ 		dnssec-revoke@EXEEXT@ dnssec-settime@EXEEXT@ \
+-		dnssec-verify@EXEEXT@
++		dnssec-verify@EXEEXT@ dnssec-importkey@EXEEXT@
+ 
+ OBJS =		dnssectool.@O@
+ 
+ SRCS =		dnssec-dsfromkey.c dnssec-keyfromlabel.c dnssec-keygen.c \
+ 		dnssec-revoke.c dnssec-settime.c dnssec-signzone.c \
+-		dnssec-verify.c dnssectool.c
++		dnssec-verify.c dnssec-importkey.c dnssectool.c 
+ 
+ MANPAGES =	dnssec-dsfromkey.8 dnssec-keyfromlabel.8 dnssec-keygen.8 \
+ 		dnssec-revoke.8 dnssec-settime.8 dnssec-signzone.8 \
+@@ -102,6 +102,10 @@ dnssec-settime@EXEEXT@: dnssec-settime.@O@ ${OBJS} ${DEPLIBS}
+ 	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ \
+ 	dnssec-settime.@O@ ${OBJS} ${LIBS}
+ 
++dnssec-importkey@EXEEXT@: dnssec-importkey.@O@ ${OBJS} ${DEPLIBS}
++	${LIBTOOL_MODE_LINK} ${PURIFY} ${CC} ${CFLAGS} ${LDFLAGS} -o $@ \
++	dnssec-importkey.@O@ ${OBJS} ${LIBS}
++
+ doc man:: ${MANOBJS}
+ 
+ docclean manclean maintainer-clean::
+diff --git a/bin/dnssec/dnssec-importkey.8 b/bin/dnssec/dnssec-importkey.8
+new file mode 100644
+index 0000000..33a3ef4
+--- /dev/null
++++ b/bin/dnssec/dnssec-importkey.8
+@@ -0,0 +1,112 @@
++.\" Copyright (C) 2013 Internet Systems Consortium, Inc. ("ISC")
++.\" 
++.\" Permission to use, copy, modify, and/or distribute this software for any
++.\" purpose with or without fee is hereby granted, provided that the above
++.\" copyright notice and this permission notice appear in all copies.
++.\" 
++.\" THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++.\" REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++.\" AND FITNESS. IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++.\" INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++.\" LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++.\" OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++.\" PERFORMANCE OF THIS SOFTWARE.
++.\"
++.\" $Id$
++.\"
++.hy 0
++.ad l
++'\" t
++.\"     Title: dnssec-importkey
++.\"    Author: [see the "AUTHOR" section]
++.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
++.\"      Date: August 30, 2013
++.\"    Manual: BIND9
++.\"    Source: BIND9
++.\"  Language: English
++.\"
++.TH "DNSSEC\-IMPORTKEY" "8" "August 30, 2013" "BIND9" "BIND9"
++.\" -----------------------------------------------------------------
++.\" * Define some portability stuff
++.\" -----------------------------------------------------------------
++.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++.\" http://bugs.debian.org/507673
++.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
++.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++.ie \n(.g .ds Aq \(aq
++.el       .ds Aq '
++.\" -----------------------------------------------------------------
++.\" * set default formatting
++.\" -----------------------------------------------------------------
++.\" disable hyphenation
++.nh
++.\" disable justification (adjust text to left margin only)
++.ad l
++.\" -----------------------------------------------------------------
++.\" * MAIN CONTENT STARTS HERE *
++.\" -----------------------------------------------------------------
++.SH "NAME"
++dnssec-importkey \- Import DNSKEY records from external systems so they can be managed\&.
++.SH "SYNOPSIS"
++.HP 17
++\fBdnssec\-importkey\fR [\fB\-f\ \fR\fB\fIfilename\fR\fR] [\fB\-K\ \fR\fB\fIdirectory\fR\fR] [\fB\-P\ \fR\fB\fIdate/offset\fR\fR] [\fB\-D\ \fR\fB\fIdate/offset\fR\fR] [\fB\-h\fR] [\fB\-v\ \fR\fB\fIlevel\fR\fR] [\fBkeyname\fR]
++.SH "DESCRIPTION"
++.PP
++\fBdnssec\-importkey\fR
++read a DNSKEY record and generated a \&.key/\&.private key pair\&. Publication (\fB\-P\fR) and deletions (\fB\-D\fR) times can be set for the key\&.
++.SH "OPTIONS"
++.PP
++\-f \fIfilename\fR
++.RS 4
++Filename to read the key from\&.
++.RE
++.PP
++\-K \fIdirectory\fR
++.RS 4
++Sets the directory in which the key files are to reside\&.
++.RE
++.PP
++\-L \fIttl\fR
++.RS 4
++Sets the default TTL to use for this key when it is converted into a DNSKEY RR\&. If the key is imported into a zone, this is the TTL that will be used for it, unless there was already a DNSKEY RRset in place, in which case the existing TTL would take precedence\&. importkey the default TTL to
++0
++or
++none
++removes it\&.
++.RE
++.PP
++\-h
++.RS 4
++Emit usage message and exit\&.
++.RE
++.PP
++\-v \fIlevel\fR
++.RS 4
++Sets the debugging level\&.
++.RE
++.SH "TIMING OPTIONS"
++.PP
++Dates can be expressed in the format YYYYMMDD or YYYYMMDDHHMMSS\&. If the argument begins with a \*(Aq+\*(Aq or \*(Aq\-\*(Aq, it is interpreted as an offset from the present time\&. For convenience, if such an offset is followed by one of the suffixes \*(Aqy\*(Aq, \*(Aqmo\*(Aq, \*(Aqw\*(Aq, \*(Aqd\*(Aq, \*(Aqh\*(Aq, or \*(Aqmi\*(Aq, then the offset is computed in years (defined as 365 24\-hour days, ignoring leap years), months (defined as 30 24\-hour days), weeks, days, hours, or minutes, respectively\&. Without a suffix, the offset is computed in seconds\&. To unset a date, use \*(Aqnone\*(Aq\&.
++.PP
++\-P \fIdate/offset\fR
++.RS 4
++Sets the date on which a key is to be published to the zone\&. After that date, the key will be included in the zone but will not be used to sign it\&.
++.RE
++.PP
++\-D \fIdate/offset\fR
++.RS 4
++Sets the date on which the key is to be deleted\&. After that date, the key will no longer be included in the zone\&. (It may remain in the key repository, however\&.)
++.RE
++.SH "SEE ALSO"
++.PP
++\fBdnssec-keygen\fR(8),
++\fBdnssec-signzone\fR(8),
++BIND 9 Administrator Reference Manual,
++RFC 5011\&.
++.SH "AUTHOR"
++.PP
++Internet Systems Consortium
++.SH "COPYRIGHT"
++.br
++Copyright \(co 2013 Internet Systems Consortium, Inc. ("ISC")
++.br
+diff --git a/bin/dnssec/dnssec-importkey.c b/bin/dnssec/dnssec-importkey.c
+new file mode 100644
+index 0000000..3491828
+--- /dev/null
++++ b/bin/dnssec/dnssec-importkey.c
+@@ -0,0 +1,399 @@
++/*
++ * Copyright (C) 2008-2012  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++/*! \file */
++
++#include <config.h>
++
++#include <stdlib.h>
++
++#include <isc/buffer.h>
++#include <isc/commandline.h>
++#include <isc/entropy.h>
++#include <isc/hash.h>
++#include <isc/mem.h>
++#include <isc/print.h>
++#include <isc/string.h>
++#include <isc/util.h>
++
++#include <dns/callbacks.h>
++#include <dns/db.h>
++#include <dns/dbiterator.h>
++#include <dns/ds.h>
++#include <dns/fixedname.h>
++#include <dns/keyvalues.h>
++#include <dns/log.h>
++#include <dns/master.h>
++#include <dns/name.h>
++#include <dns/rdata.h>
++#include <dns/rdataclass.h>
++#include <dns/rdataset.h>
++#include <dns/rdatasetiter.h>
++#include <dns/rdatatype.h>
++#include <dns/result.h>
++
++#include <dst/dst.h>
++
++#include "dnssectool.h"
++
++#ifndef PATH_MAX
++#define PATH_MAX 1024   /* AIX, WIN32, and others don't define this. */
++#endif
++
++const char *program = "dnssec-importkey";
++int verbose;
++
++static dns_rdataclass_t rdclass;
++static dns_fixedname_t	fixed;
++static dns_name_t	*name = NULL;
++static isc_mem_t	*mctx = NULL;
++static isc_boolean_t	setpub = ISC_FALSE, setdel = ISC_FALSE;
++static isc_stdtime_t	pub = 0, del = 0;
++
++static isc_result_t
++initname(char *setname) {
++	isc_result_t result;
++	isc_buffer_t buf;
++
++	dns_fixedname_init(&fixed);
++	name = dns_fixedname_name(&fixed);
++
++	isc_buffer_init(&buf, setname, strlen(setname));
++	isc_buffer_add(&buf, strlen(setname));
++	result = dns_name_fromtext(name, &buf, dns_rootname, 0, NULL);
++	return (result);
++}
++
++static void
++db_load_from_stream(dns_db_t *db, FILE *fp) {
++	isc_result_t result;
++	dns_rdatacallbacks_t callbacks;
++
++	dns_rdatacallbacks_init(&callbacks);
++	result = dns_db_beginload(db, &callbacks.add, &callbacks.add_private);
++	if (result != ISC_R_SUCCESS)
++		fatal("dns_db_beginload failed: %s", isc_result_totext(result));
++
++	result = dns_master_loadstream(fp, name, name, rdclass, 0,
++				       &callbacks, mctx);
++	if (result != ISC_R_SUCCESS)
++		fatal("can't load from input: %s", isc_result_totext(result));
++
++	result = dns_db_endload(db, &callbacks.add_private);
++	if (result != ISC_R_SUCCESS)
++		fatal("dns_db_endload failed: %s", isc_result_totext(result));
++}
++
++static isc_result_t
++loadset(const char *filename, dns_rdataset_t *rdataset) {
++	isc_result_t	 result;
++	dns_db_t	 *db = NULL;
++	dns_dbnode_t	 *node = NULL;
++	char setname[DNS_NAME_FORMATSIZE];
++
++	dns_name_format(name, setname, sizeof(setname));
++
++	result = dns_db_create(mctx, "rbt", name, dns_dbtype_zone,
++			       rdclass, 0, NULL, &db);
++	if (result != ISC_R_SUCCESS)
++		fatal("can't create database");
++
++	if (strcmp(filename, "-") == 0) {
++		db_load_from_stream(db, stdin);
++		filename = "input";
++	} else {
++		result = dns_db_load3(db, filename, dns_masterformat_text,
++				      DNS_MASTER_NOTTL);
++		if (result != ISC_R_SUCCESS && result != DNS_R_SEENINCLUDE)
++			fatal("can't load %s: %s", filename,
++			      isc_result_totext(result));
++	}
++
++	result = dns_db_findnode(db, name, ISC_FALSE, &node);
++	if (result != ISC_R_SUCCESS)
++		fatal("can't find %s node in %s", setname, filename);
++
++	result = dns_db_findrdataset(db, node, NULL, dns_rdatatype_dnskey,
++				     0, 0, rdataset, NULL);
++
++	if (result == ISC_R_NOTFOUND)
++		fatal("no DNSKEY RR for %s in %s", setname, filename);
++	else if (result != ISC_R_SUCCESS)
++		fatal("dns_db_findrdataset");
++
++	if (node != NULL)
++		dns_db_detachnode(db, &node);
++	if (db != NULL)
++		dns_db_detach(&db);
++	return (result);
++}
++
++static void
++loadkey(char *filename, unsigned char *key_buf, unsigned int key_buf_size,
++	dns_rdata_t *rdata)
++{
++	isc_result_t  result;
++	dst_key_t     *key = NULL;
++	isc_buffer_t  keyb;
++	isc_region_t  r;
++
++	dns_rdata_init(rdata);
++
++	isc_buffer_init(&keyb, key_buf, key_buf_size);
++
++	result = dst_key_fromnamedfile(filename, NULL, DST_TYPE_PUBLIC,
++				       mctx, &key);
++	if (result != ISC_R_SUCCESS)
++		fatal("invalid keyfile name %s: %s",
++		      filename, isc_result_totext(result));
++
++	if (verbose > 2) {
++		char keystr[DST_KEY_FORMATSIZE];
++
++		dst_key_format(key, keystr, sizeof(keystr));
++		fprintf(stderr, "%s: %s\n", program, keystr);
++	}
++
++	result = dst_key_todns(key, &keyb);
++	if (result != ISC_R_SUCCESS)
++		fatal("can't decode key");
++
++	isc_buffer_usedregion(&keyb, &r);
++	dns_rdata_fromregion(rdata, dst_key_class(key),
++			     dns_rdatatype_dnskey, &r);
++
++	rdclass = dst_key_class(key);
++
++	dns_fixedname_init(&fixed);
++	name = dns_fixedname_name(&fixed);
++	result = dns_name_copy(dst_key_name(key), name, NULL);
++	if (result != ISC_R_SUCCESS)
++		fatal("can't copy name");
++
++	dst_key_free(&key);
++}
++
++static void
++emit(const char *dir, dns_rdata_t *rdata) {
++	isc_result_t result;
++	char keystr[DST_KEY_FORMATSIZE];
++	char newname[1024];
++	isc_buffer_t buf;
++	dst_key_t *key = NULL;
++
++	isc_buffer_init(&buf, rdata->data, rdata->length);
++	isc_buffer_add(&buf, rdata->length);
++	result = dst_key_fromdns(name, rdclass, &buf, mctx, &key);
++	if (result != ISC_R_SUCCESS) {
++		fatal("dst_key_fromdns: %s", isc_result_totext(result));
++	}
++
++	dst_key_setexternal(key, ISC_TRUE);
++	if (setpub)
++		dst_key_settime(key, DST_TIME_PUBLISH, pub);
++	if (setdel)
++		dst_key_settime(key, DST_TIME_DELETE, del);
++
++	isc_buffer_init(&buf, newname, sizeof(newname));
++	result = dst_key_buildfilename(key, DST_TYPE_PUBLIC, dir, &buf);
++	if (result != ISC_R_SUCCESS) {
++		fatal("Failed to build public key filename: %s",
++		      isc_result_totext(result));
++	}
++
++	result = dst_key_tofile(key, DST_TYPE_PUBLIC|DST_TYPE_PRIVATE,
++				dir);
++	if (result != ISC_R_SUCCESS) {
++		dst_key_format(key, keystr, sizeof(keystr));
++		fatal("Failed to write key %s: %s", keystr,
++		      isc_result_totext(result));
++	}
++
++	printf("%s\n", newname);
++
++	isc_buffer_clear(&buf);
++	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, dir, &buf);
++	if (result != ISC_R_SUCCESS) {
++		fatal("Failed to build private key filename: %s",
++		      isc_result_totext(result));
++	}
++	printf("%s\n", newname);
++	dst_key_free(&key);
++}
++
++ISC_PLATFORM_NORETURN_PRE static void
++usage(void) ISC_PLATFORM_NORETURN_POST;
++
++static void
++usage(void) {
++	fprintf(stderr, "Usage:\n");
++	fprintf(stderr,	"    %s options [-K dir] file\n\n", program);
++	fprintf(stderr, "Version: %s\n", VERSION);
++	fprintf(stderr, "Options:\n");
++	fprintf(stderr, "    -v <verbose level>\n");
++	fprintf(stderr, "    -K <directory>: directory in which to store "
++			"the keyset files\n");
++	fprintf(stderr, "    -f file: read keyset from zone file\n");
++
++	exit (-1);
++}
++
++int
++main(int argc, char **argv) {
++	char		*classname = NULL;
++	char		*filename = NULL, *dir = NULL, *namestr;
++	char		*endp;
++	int		ch;
++	isc_result_t	result;
++	isc_log_t	*log = NULL;
++	isc_entropy_t	*ectx = NULL;
++	dns_rdataset_t	rdataset;
++	dns_rdata_t	rdata;
++	isc_stdtime_t   now;
++
++	dns_rdata_init(&rdata);
++	isc_stdtime_get(&now);
++
++	if (argc == 1)
++		usage();
++
++	result = isc_mem_create(0, 0, &mctx);
++	if (result != ISC_R_SUCCESS)
++		fatal("out of memory");
++
++	dns_result_register();
++
++	isc_commandline_errprint = ISC_FALSE;
++
++	while ((ch = isc_commandline_parse(argc, argv, "D:f:hK:P:v:")) != -1) {
++		switch (ch) {
++                case 'D':
++                        if (setdel)
++                                fatal("-D specified more than once");
++
++			setdel = ISC_TRUE;
++			del = strtotime(isc_commandline_argument, now, now);
++			break;
++		case 'K':
++			dir = isc_commandline_argument;
++			if (strlen(dir) == 0U)
++				fatal("directory must be non-empty string");
++			break;
++                case 'P':
++                        if (setpub)
++                                fatal("-P specified more than once");
++
++			setpub = ISC_TRUE;
++			pub = strtotime(isc_commandline_argument, now, now);
++                        break;
++		case 'f':
++			filename = isc_commandline_argument;
++			break;
++		case 'v':
++			verbose = strtol(isc_commandline_argument, &endp, 0);
++			if (*endp != '\0')
++				fatal("-v must be followed by a number");
++			break;
++		case '?':
++			if (isc_commandline_option != '?')
++				fprintf(stderr, "%s: invalid argument -%c\n",
++					program, isc_commandline_option);
++			/* FALLTHROUGH */
++		case 'h':
++			usage();
++
++		default:
++			fprintf(stderr, "%s: unhandled option -%c\n",
++				program, isc_commandline_option);
++			exit(1);
++		}
++	}
++
++	rdclass = strtoclass(classname);
++
++	if (argc < isc_commandline_index + 1 && filename == NULL)
++		fatal("the key file name was not specified");
++	if (argc > isc_commandline_index + 1)
++		fatal("extraneous arguments");
++
++	if (ectx == NULL)
++		setup_entropy(mctx, NULL, &ectx);
++	result = isc_hash_create(mctx, ectx, DNS_NAME_MAXWIRE);
++	if (result != ISC_R_SUCCESS)
++		fatal("could not initialize hash");
++	result = dst_lib_init(mctx, ectx,
++			      ISC_ENTROPY_BLOCKING | ISC_ENTROPY_GOODONLY);
++	if (result != ISC_R_SUCCESS)
++		fatal("could not initialize dst: %s",
++		      isc_result_totext(result));
++	isc_entropy_stopcallbacksources(ectx);
++
++	setup_logging(verbose, mctx, &log);
++
++	dns_rdataset_init(&rdataset);
++
++	if (filename != NULL) {
++		if (argc < isc_commandline_index + 1 && filename != NULL) {
++			/* using zone name as the zone file name */
++			namestr = filename;
++		} else
++			namestr = argv[isc_commandline_index];
++
++		result = initname(namestr);
++		if (result != ISC_R_SUCCESS)
++			fatal("could not initialize name %s", namestr);
++
++		result = loadset(filename, &rdataset);
++
++		if (result != ISC_R_SUCCESS)
++			fatal("could not load DNSKEY set: %s\n",
++			      isc_result_totext(result));
++
++		for (result = dns_rdataset_first(&rdataset);
++		     result == ISC_R_SUCCESS;
++		     result = dns_rdataset_next(&rdataset)) {
++
++			dns_rdata_init(&rdata);
++			dns_rdataset_current(&rdataset, &rdata);
++			emit(dir, &rdata);
++		}
++	} else {
++		unsigned char key_buf[DST_KEY_MAXSIZE];
++
++		loadkey(argv[isc_commandline_index], key_buf,
++			DST_KEY_MAXSIZE, &rdata);
++
++		emit(dir, &rdata);
++	}
++
++	if (dns_rdataset_isassociated(&rdataset))
++		dns_rdataset_disassociate(&rdataset);
++	cleanup_logging(&log);
++	dst_lib_destroy();
++	isc_hash_destroy();
++	cleanup_entropy(&ectx);
++	dns_name_destroy();
++	if (verbose > 10)
++		isc_mem_stats(mctx, stdout);
++	isc_mem_destroy(&mctx);
++
++	fflush(stdout);
++	if (ferror(stdout)) {
++		fprintf(stderr, "write error\n");
++		return (1);
++	} else
++		return (0);
++}
+diff --git a/bin/dnssec/dnssec-importkey.docbook b/bin/dnssec/dnssec-importkey.docbook
+new file mode 100644
+index 0000000..b8d160c
+--- /dev/null
++++ b/bin/dnssec/dnssec-importkey.docbook
+@@ -0,0 +1,185 @@
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
++               "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
++               [<!ENTITY mdash "&#8212;">]>
++<!--
++ - Copyright (C) 2009-2011  Internet Systems Consortium, Inc. ("ISC")
++ -
++ - Permission to use, copy, modify, and/or distribute this software for any
++ - purpose with or without fee is hereby granted, provided that the above
++ - copyright notice and this permission notice appear in all copies.
++ -
++ - THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ - REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ - AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ - INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ - LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ - OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ - PERFORMANCE OF THIS SOFTWARE.
++-->
++
++<!-- $Id: dnssec-importkey.docbook,v 1.15 2011/11/03 20:21:37 each Exp $ -->
++<refentry id="man.dnssec-importkey">
++  <refentryinfo>
++    <date>August 30, 2013</date>
++  </refentryinfo>
++
++  <refmeta>
++    <refentrytitle><application>dnssec-importkey</application></refentrytitle>
++    <manvolnum>8</manvolnum>
++    <refmiscinfo>BIND9</refmiscinfo>
++  </refmeta>
++
++  <refnamediv>
++    <refname><application>dnssec-importkey</application></refname>
++    <refpurpose>Import DNSKEY records from external systems so they can be managed.</refpurpose>
++  </refnamediv>
++
++  <docinfo>
++    <copyright>
++      <year>2013</year>
++      <holder>Internet Systems Consortium, Inc. ("ISC")</holder>
++    </copyright>
++  </docinfo>
++
++  <refsynopsisdiv>
++    <cmdsynopsis>
++      <command>dnssec-importkey</command>
++      <arg><option>-f <replaceable class="parameter">filename</replaceable></option></arg>
++      <arg><option>-K <replaceable class="parameter">directory</replaceable></option></arg>
++      <arg><option>-P <replaceable class="parameter">date/offset</replaceable></option></arg>
++      <arg><option>-D <replaceable class="parameter">date/offset</replaceable></option></arg>
++      <arg><option>-h</option></arg>
++      <arg><option>-v <replaceable class="parameter">level</replaceable></option></arg>
++      <arg><option>keyname</option></arg>
++    </cmdsynopsis>
++  </refsynopsisdiv>
++
++  <refsect1>
++    <title>DESCRIPTION</title>
++    <para><command>dnssec-importkey</command>
++      read a DNSKEY record and generated a .key/.private key pair.
++      Publication (<option>-P</option>) and deletions (<option>-D</option>)
++      times can be set for the key.
++    </para>
++  </refsect1>
++
++  <refsect1>
++    <title>OPTIONS</title>
++
++    <variablelist>
++      <varlistentry>
++	<term>-f <replaceable class="parameter">filename</replaceable></term>
++        <listitem>
++	  <para>
++	    Filename to read the key from.
++	  </para>
++        </listitem>
++      </varlistentry>
++  
++      <varlistentry>
++        <term>-K <replaceable class="parameter">directory</replaceable></term>
++        <listitem>
++          <para>
++            Sets the directory in which the key files are to reside.
++          </para>
++        </listitem>
++      </varlistentry>
++
++      <varlistentry>
++        <term>-L <replaceable class="parameter">ttl</replaceable></term>
++        <listitem>
++          <para>
++            Sets the default TTL to use for this key when it is converted
++            into a DNSKEY RR.  If the key is imported into a zone,
++            this is the TTL that will be used for it, unless there was
++            already a DNSKEY RRset in place, in which case the existing TTL
++            would take precedence.  importkey the default TTL to
++            <literal>0</literal> or <literal>none</literal> removes it.
++          </para>
++        </listitem>
++      </varlistentry>
++
++      <varlistentry>
++	<term>-h</term>
++        <listitem>
++	  <para>
++	    Emit usage message and exit.
++	  </para>
++        </listitem>
++      </varlistentry>
++  
++      <varlistentry>
++        <term>-v <replaceable class="parameter">level</replaceable></term>
++        <listitem>
++          <para>
++            Sets the debugging level.
++          </para>
++        </listitem>
++      </varlistentry>
++
++    </variablelist>
++  </refsect1>
++
++  <refsect1>
++    <title>TIMING OPTIONS</title>
++    <para>
++      Dates can be expressed in the format YYYYMMDD or YYYYMMDDHHMMSS.
++      If the argument begins with a '+' or '-', it is interpreted as
++      an offset from the present time.  For convenience, if such an offset
++      is followed by one of the suffixes 'y', 'mo', 'w', 'd', 'h', or 'mi',
++      then the offset is computed in years (defined as 365 24-hour days,
++      ignoring leap years), months (defined as 30 24-hour days), weeks,
++      days, hours, or minutes, respectively.  Without a suffix, the offset
++      is computed in seconds.  To unset a date, use 'none'.
++    </para>
++
++    <variablelist>
++      <varlistentry>
++        <term>-P <replaceable class="parameter">date/offset</replaceable></term>
++        <listitem>
++          <para>
++            Sets the date on which a key is to be published to the zone.
++            After that date, the key will be included in the zone but will
++            not be used to sign it.
++          </para>
++        </listitem>
++      </varlistentry>
++
++      <varlistentry>
++        <term>-D <replaceable class="parameter">date/offset</replaceable></term>
++        <listitem>
++          <para>
++            Sets the date on which the key is to be deleted.  After that
++            date, the key will no longer be included in the zone.  (It
++            may remain in the key repository, however.)
++          </para>
++        </listitem>
++      </varlistentry>
++
++    </variablelist>
++  </refsect1>
++
++  <refsect1>
++    <title>SEE ALSO</title>
++    <para><citerefentry>
++        <refentrytitle>dnssec-keygen</refentrytitle><manvolnum>8</manvolnum>
++      </citerefentry>,
++      <citerefentry>
++        <refentrytitle>dnssec-signzone</refentrytitle><manvolnum>8</manvolnum>
++      </citerefentry>,
++      <citetitle>BIND 9 Administrator Reference Manual</citetitle>,
++      <citetitle>RFC 5011</citetitle>.
++    </para>
++  </refsect1>
++
++  <refsect1>
++    <title>AUTHOR</title>
++    <para><corpauthor>Internet Systems Consortium</corpauthor>
++    </para>
++  </refsect1>
++
++</refentry><!--
++ - Local variables:
++ - mode: sgml
++ - End:
++-->
+diff --git a/bin/dnssec/dnssec-importkey.html b/bin/dnssec/dnssec-importkey.html
+new file mode 100644
+index 0000000..f74be50
+--- /dev/null
++++ b/bin/dnssec/dnssec-importkey.html
+@@ -0,0 +1,112 @@
++<!--
++ - Copyright (C) 2013 Internet Systems Consortium, Inc. ("ISC")
++ - 
++ - Permission to use, copy, modify, and/or distribute this software for any
++ - purpose with or without fee is hereby granted, provided that the above
++ - copyright notice and this permission notice appear in all copies.
++ - 
++ - THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ - REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ - AND FITNESS. IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ - INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ - LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ - OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ - PERFORMANCE OF THIS SOFTWARE.
++-->
++<!-- $Id$ -->
++<html>
++<head>
++<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
++<title>dnssec-importkey</title>
++<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
++</head>
++<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="refentry">
++<a name="man.dnssec-importkey"></a><div class="titlepage"></div>
++<div class="refnamediv">
++<h2>Name</h2>
++<p><span class="application">dnssec-importkey</span> &#8212; Import DNSKEY records from external systems so they can be managed.</p>
++</div>
++<div class="refsynopsisdiv">
++<h2>Synopsis</h2>
++<div class="cmdsynopsis"><p><code class="command">dnssec-importkey</code>  [<code class="option">-f <em class="replaceable"><code>filename</code></em></code>] [<code class="option">-K <em class="replaceable"><code>directory</code></em></code>] [<code class="option">-P <em class="replaceable"><code>date/offset</code></em></code>] [<code class="option">-D <em class="replaceable"><code>date/offset</code></em></code>] [<code class="option">-h</code>] [<code class="option">-v <em class="replaceable"><code>level</code></em></code>] [<code class="option">keyname</code>]</p></div>
++</div>
++<div class="refsect1">
++<a name="idp5321760"></a><h2>DESCRIPTION</h2>
++<p><span class="command"><strong>dnssec-importkey</strong></span>
++      read a DNSKEY record and generated a .key/.private key pair.
++      Publication (<code class="option">-P</code>) and deletions (<code class="option">-D</code>)
++      times can be set for the key.
++    </p>
++</div>
++<div class="refsect1">
++<a name="idp5324080"></a><h2>OPTIONS</h2>
++<div class="variablelist"><dl class="variablelist">
++<dt><span class="term">-f <em class="replaceable"><code>filename</code></em></span></dt>
++<dd><p>
++	    Filename to read the key from.
++	  </p></dd>
++<dt><span class="term">-K <em class="replaceable"><code>directory</code></em></span></dt>
++<dd><p>
++            Sets the directory in which the key files are to reside.
++          </p></dd>
++<dt><span class="term">-L <em class="replaceable"><code>ttl</code></em></span></dt>
++<dd><p>
++            Sets the default TTL to use for this key when it is converted
++            into a DNSKEY RR.  If the key is imported into a zone,
++            this is the TTL that will be used for it, unless there was
++            already a DNSKEY RRset in place, in which case the existing TTL
++            would take precedence.  importkey the default TTL to
++            <code class="literal">0</code> or <code class="literal">none</code> removes it.
++          </p></dd>
++<dt><span class="term">-h</span></dt>
++<dd><p>
++	    Emit usage message and exit.
++	  </p></dd>
++<dt><span class="term">-v <em class="replaceable"><code>level</code></em></span></dt>
++<dd><p>
++            Sets the debugging level.
++          </p></dd>
++</dl></div>
++</div>
++<div class="refsect1">
++<a name="idp5336224"></a><h2>TIMING OPTIONS</h2>
++<p>
++      Dates can be expressed in the format YYYYMMDD or YYYYMMDDHHMMSS.
++      If the argument begins with a '+' or '-', it is interpreted as
++      an offset from the present time.  For convenience, if such an offset
++      is followed by one of the suffixes 'y', 'mo', 'w', 'd', 'h', or 'mi',
++      then the offset is computed in years (defined as 365 24-hour days,
++      ignoring leap years), months (defined as 30 24-hour days), weeks,
++      days, hours, or minutes, respectively.  Without a suffix, the offset
++      is computed in seconds.  To unset a date, use 'none'.
++    </p>
++<div class="variablelist"><dl class="variablelist">
++<dt><span class="term">-P <em class="replaceable"><code>date/offset</code></em></span></dt>
++<dd><p>
++            Sets the date on which a key is to be published to the zone.
++            After that date, the key will be included in the zone but will
++            not be used to sign it.
++          </p></dd>
++<dt><span class="term">-D <em class="replaceable"><code>date/offset</code></em></span></dt>
++<dd><p>
++            Sets the date on which the key is to be deleted.  After that
++            date, the key will no longer be included in the zone.  (It
++            may remain in the key repository, however.)
++          </p></dd>
++</dl></div>
++</div>
++<div class="refsect1">
++<a name="idp5342816"></a><h2>SEE ALSO</h2>
++<p><span class="citerefentry"><span class="refentrytitle">dnssec-keygen</span>(8)</span>,
++      <span class="citerefentry"><span class="refentrytitle">dnssec-signzone</span>(8)</span>,
++      <em class="citetitle">BIND 9 Administrator Reference Manual</em>,
++      <em class="citetitle">RFC 5011</em>.
++    </p>
++</div>
++<div class="refsect1">
++<a name="idp5346704"></a><h2>AUTHOR</h2>
++<p><span class="corpauthor">Internet Systems Consortium</span>
++    </p>
++</div>
++</div></body>
++</html>
+diff --git a/bin/dnssec/dnssec-settime.c b/bin/dnssec/dnssec-settime.c
+index 4c88a07..108d803 100644
+--- a/bin/dnssec/dnssec-settime.c
++++ b/bin/dnssec/dnssec-settime.c
+@@ -370,7 +370,7 @@ main(int argc, char **argv) {
+ 		if (result != ISC_R_SUCCESS)
+ 			fatal("Invalid keyfile %s: %s",
+ 			      filename, isc_result_totext(result));
+-		if (!dst_key_isprivate(prevkey))
++		if (!dst_key_isprivate(prevkey) && !dst_key_isexternal(prevkey))
+ 			fatal("%s is not a private key", filename);
+ 
+ 		name = dst_key_name(prevkey);
+@@ -462,7 +462,7 @@ main(int argc, char **argv) {
+ 		fatal("Invalid keyfile %s: %s",
+ 		      filename, isc_result_totext(result));
+ 
+-	if (!dst_key_isprivate(key))
++	if (!dst_key_isprivate(key) && !dst_key_isexternal(key))
+ 		fatal("%s is not a private key", filename);
+ 
+ 	dst_key_format(key, keystr, sizeof(keystr));
+diff --git a/bin/tests/system/conf.sh.in b/bin/tests/system/conf.sh.in
+index 60f22f8..b15853d 100644
+--- a/bin/tests/system/conf.sh.in
++++ b/bin/tests/system/conf.sh.in
+@@ -43,6 +43,7 @@ SIGNER=$TOP/bin/dnssec/dnssec-signzone
+ REVOKE=$TOP/bin/dnssec/dnssec-revoke
+ SETTIME=$TOP/bin/dnssec/dnssec-settime
+ DSFROMKEY=$TOP/bin/dnssec/dnssec-dsfromkey
++IMPORTKEY=$TOP/bin/dnssec/dnssec-importkey
+ CHECKDS=$TOP/bin/python/dnssec-checkds
+ COVERAGE=$TOP/bin/python/dnssec-coverage
+ CHECKZONE=$TOP/bin/check/named-checkzone
+diff --git a/bin/tests/system/inline/clean.sh b/bin/tests/system/inline/clean.sh
+index 8ef3e2c..412031a 100644
+--- a/bin/tests/system/inline/clean.sh
++++ b/bin/tests/system/inline/clean.sh
+@@ -60,6 +60,9 @@ rm -f ns3/retransfer.bk
+ rm -f ns3/retransfer.bk.jnl
+ rm -f ns3/retransfer.bk.signed
+ rm -f ns3/retransfer.bk.signed.jnl
++rm -f ns3/externalkey.db
++rm -f ns3/externalkey.db.signed
++rm -f ns3/externalkey.db.signed.jnl
+ rm -f ns4/K*
+ rm -f ns4/noixfr.db
+ rm -f ns4/noixfr.db.jnl
+diff --git a/bin/tests/system/inline/ns1/root.db.in b/bin/tests/system/inline/ns1/root.db.in
+index 8d3af51..a08db51 100644
+--- a/bin/tests/system/inline/ns1/root.db.in
++++ b/bin/tests/system/inline/ns1/root.db.in
+@@ -50,3 +50,6 @@ ns3.retransfer.		A	10.53.0.3
+ 
+ nsec3.			NS	ns3.nsec3.
+ ns3.nsec3.		A	10.53.0.3
++
++externalkey.		NS	ns3.externalkey.
++ns3.externalkey.	A	10.53.0.3
+diff --git a/bin/tests/system/inline/ns3/named.conf b/bin/tests/system/inline/ns3/named.conf
+index a17384c..7c23edd 100644
+--- a/bin/tests/system/inline/ns3/named.conf
++++ b/bin/tests/system/inline/ns3/named.conf
+@@ -103,3 +103,11 @@ zone "nsec3" {
+ 	allow-update { any; };
+ 	file "nsec3.db";
+ };
++
++zone "externalkey" {
++	type master;
++	inline-signing yes;
++	auto-dnssec maintain;
++	allow-update { any; };
++	file "externalkey.db";
++};
+diff --git a/bin/tests/system/inline/ns3/sign.sh b/bin/tests/system/inline/ns3/sign.sh
+index bbd11af..f695973 100644
+--- a/bin/tests/system/inline/ns3/sign.sh
++++ b/bin/tests/system/inline/ns3/sign.sh
+@@ -92,3 +92,32 @@ do
+ 	keyname=`$KEYGEN -q -r $RANDFILE -a RSASHA1 -b 768 -n zone $zone`
+ 	keyname=`$KEYGEN -q -r $RANDFILE -a RSASHA1 -b 1024 -n zone -f KSK $zone`
+ done
++
++zone=externalkey
++rm -f K${zone}.+*+*.key
++rm -f K${zone}.+*+*.private
++
++for alg in ECDSAP256SHA256 NSEC3RSASHA1 DSA ECCGOST
++do
++
++if test $alg = ECCGOST
++then
++	sh ../../gost/prereq.sh 2> /dev/null || continue
++fi
++
++k1=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone -f KSK $zone`
++k2=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone $zone`
++k3=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone $zone`
++k4=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone $zone`
++keyname=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone $zone`
++keyname=`$KEYGEN -q -r $RANDFILE -a $alg -b 1024 -n zone -f KSK $zone`
++$DSFROMKEY -T 1200 $keyname >> ../ns1/root.db
++rm -f ${k3}.* ${k4}.*
++
++#
++# Convert k1 and k2 in to External Keys.
++rm -f $k1.private 
++$IMPORTKEY -P now -D now+3600 -f $k1.key $zone
++rm -f $k2.private 
++$IMPORTKEY -f $k2.key $zone
++done
+diff --git a/bin/tests/system/inline/setup.sh b/bin/tests/system/inline/setup.sh
+index 9fa42ab..adee4ff 100644
+--- a/bin/tests/system/inline/setup.sh
++++ b/bin/tests/system/inline/setup.sh
+@@ -29,6 +29,7 @@ cp ns3/master.db.in ns3/dynamic.db
+ cp ns3/master.db.in ns3/updated.db
+ cp ns3/master.db.in ns3/expired.db
+ cp ns3/master.db.in ns3/nsec3.db
++cp ns3/master.db.in ns3/externalkey.db
+ 
+ touch ns4/trusted.conf
+ cp ns4/noixfr.db.in ns4/noixfr.db
+diff --git a/bin/tests/system/inline/tests.sh b/bin/tests/system/inline/tests.sh
+index 7e2e3d2..8acdee2 100644
+--- a/bin/tests/system/inline/tests.sh
++++ b/bin/tests/system/inline/tests.sh
+@@ -809,7 +809,22 @@ $RNDC -c ../common/rndc.conf -s 10.53.0.3 -p 9953 addzone test-$zone \
+ $RNDC -c ../common/rndc.conf -s 10.53.0.3 -p 9953 delzone test-$zone
+ done
+ 
+-if [ $ret != 0 ]; then echo "I:failed"; fi
++n=`expr $n + 1`
++echo "I:testing adding external keys to a inline zone ($n)"
++ret=0
++$DIG $DIGOPTS @10.53.0.3 -p 5300 dnskey externalkey > dig.out.ns3.test$n
++for alg in 3 7 12 13
++do
++if test $alg = 12 
++then
++	sh ../gost/prereq.sh 2>/dev/null || continue;
++fi
++
++dnskeys=`grep "IN.DNSKEY.25[67] [0-9]* $alg " dig.out.ns3.test$n | wc -l`
++rrsigs=`grep "RRSIG.DNSKEY $alg " dig.out.ns3.test$n | wc -l`
++test ${dnskeys:-0} -eq 3 || { echo "I: failed $alg (dnskeys ${dnskeys:-0})"; ret=1; }
++test ${rrsigs:-0} -eq 2 || { echo "I: failed $alg (rrsigs ${rrsigs:-0})"; ret=1; }
++done
+ status=`expr $status + $ret`
+ 
+ exit $status
+diff --git a/lib/dns/dnssec.c b/lib/dns/dnssec.c
+index a1c5c69..cf97404 100644
+--- a/lib/dns/dnssec.c
++++ b/lib/dns/dnssec.c
+@@ -684,6 +684,7 @@ dns_dnssec_findzonekeys2(dns_db_t *db, dns_dbversion_t *ver,
+ 	isc_stdtime_get(&now);
+ 
+ 	*nkeys = 0;
++	memset(keys, 0, sizeof(*keys) * maxkeys);
+ 	dns_rdataset_init(&rdataset);
+ 	RETERR(dns_db_findrdataset(db, node, ver, dns_rdatatype_dnskey, 0, 0,
+ 				   &rdataset, NULL));
+@@ -1312,9 +1313,9 @@ dns_dnssec_findmatchingkeys(dns_name_t *origin, const char *directory,
+ 	isc_dir_t dir;
+ 	dns_dnsseckey_t *key = NULL;
+ 	dst_key_t *dstkey = NULL;
+-	char namebuf[DNS_NAME_FORMATSIZE], *p;
++	char namebuf[DNS_NAME_FORMATSIZE];
+ 	isc_buffer_t b;
+-	unsigned int len;
++	unsigned int len, i;
+ 	isc_stdtime_t now;
+ 
+ 	REQUIRE(keylist != NULL);
+@@ -1334,49 +1335,62 @@ dns_dnssec_findmatchingkeys(dns_name_t *origin, const char *directory,
+ 	isc_stdtime_get(&now);
+ 
+ 	while (isc_dir_read(&dir) == ISC_R_SUCCESS) {
+-		if (dir.entry.name[0] == 'K' &&
+-		    dir.entry.length > len + 1 &&
+-		    dir.entry.name[len + 1] == '+' &&
+-		    strncasecmp(dir.entry.name + 1, namebuf, len) == 0) {
+-			p = strrchr(dir.entry.name, '.');
+-			if (p != NULL && strcmp(p, ".private") != 0)
+-				continue;
++		if (dir.entry.name[0] != 'K' ||
++		    dir.entry.length < len + 1 ||
++		    dir.entry.name[len + 1] != '+' ||
++		    strncasecmp(dir.entry.name + 1, namebuf, len) != 0)
++			continue;
++
++		for (i = len + 1 + 1; i < dir.entry.length ; i++)
++			if (dir.entry.name[i] < '0' || dir.entry.name[i] > '9')
++				break;
++
++		if (i == len + 1 + 1 || i >= dir.entry.length ||
++		    dir.entry.name[i] != '+')
++			continue;
++
++		for (i++ ; i < dir.entry.length ; i++)
++			if (dir.entry.name[i] < '0' || dir.entry.name[i] > '9')
++				break;
+ 
+-			dstkey = NULL;
+-			result = dst_key_fromnamedfile(dir.entry.name,
+-						       directory,
+-						       DST_TYPE_PUBLIC |
+-						       DST_TYPE_PRIVATE,
+-						       mctx, &dstkey);
+-
+-			if (result != ISC_R_SUCCESS) {
+-				isc_log_write(dns_lctx,
+-					      DNS_LOGCATEGORY_GENERAL,
+-					      DNS_LOGMODULE_DNSSEC,
+-					      ISC_LOG_WARNING,
+-					      "dns_dnssec_findmatchingkeys: "
+-					      "error reading key file %s: %s",
+-					      dir.entry.name,
+-					      isc_result_totext(result));
++		if (strcmp(dir.entry.name + i, ".private") != 0)
+ 				continue;
+-			}
+ 
+-			RETERR(dns_dnsseckey_create(mctx, &dstkey, &key));
+-			key->source = dns_keysource_repository;
+-			get_hints(key, now);
++		dstkey = NULL;
++		result = dst_key_fromnamedfile(dir.entry.name,
++					       directory,
++					       DST_TYPE_PUBLIC |
++					       DST_TYPE_PRIVATE,
++					       mctx, &dstkey);
+ 
+-			if (key->legacy) {
+-				dns_dnsseckey_destroy(mctx, &key);
+-			} else {
+-				ISC_LIST_APPEND(list, key, link);
+-				key = NULL;
+-			}
++		if (result != ISC_R_SUCCESS) {
++			isc_log_write(dns_lctx,
++				      DNS_LOGCATEGORY_GENERAL,
++				      DNS_LOGMODULE_DNSSEC,
++				      ISC_LOG_WARNING,
++				      "dns_dnssec_findmatchingkeys: "
++				      "error reading key file %s: %s",
++				      dir.entry.name,
++				      isc_result_totext(result));
++			continue;
++		}
++
++		RETERR(dns_dnsseckey_create(mctx, &dstkey, &key));
++		key->source = dns_keysource_repository;
++		get_hints(key, now);
++
++		if (key->legacy) {
++			dns_dnsseckey_destroy(mctx, &key);
++		} else {
++			ISC_LIST_APPEND(list, key, link);
++			key = NULL;
+ 		}
+ 	}
+ 
+-	if (!ISC_LIST_EMPTY(list))
++	if (!ISC_LIST_EMPTY(list)) {
++		result = ISC_R_SUCCESS;
+ 		ISC_LIST_APPENDLIST(*keylist, list, link);
+-	else
++	} else
+ 		result = ISC_R_NOTFOUND;
+ 
+  failure:
+@@ -1794,7 +1808,13 @@ dns_dnssec_updatekeys(dns_dnsseckeylist_t *keys, dns_dnsseckeylist_t *newkeys,
+ 		for (key2 = ISC_LIST_HEAD(*keys);
+ 		     key2 != NULL;
+ 		     key2 = ISC_LIST_NEXT(key2, link)) {
+-			if (dst_key_pubcompare(key1->key, key2->key,
++			int f1 = dst_key_flags(key1->key);
++			int f2 = dst_key_flags(key2->key);
++			int nr1 = f1 & ~DNS_KEYFLAG_REVOKE;
++			int nr2 = f2 & ~DNS_KEYFLAG_REVOKE;
++			if (nr1 == nr2 &&
++			    dst_key_alg(key1->key) == dst_key_alg(key2->key) &&
++			    dst_key_pubcompare(key1->key, key2->key,
+ 					       ISC_TRUE)) {
+ 				int r1, r2;
+ 				r1 = dst_key_flags(key1->key) &
+diff --git a/lib/dns/dst_api.c b/lib/dns/dst_api.c
+index c310be5..4c174f3 100644
+--- a/lib/dns/dst_api.c
++++ b/lib/dns/dst_api.c
+@@ -448,6 +448,16 @@ dst_key_tofile(const dst_key_t *key, int type, const char *directory) {
+ 		return (ISC_R_SUCCESS);
+ }
+ 
++void
++dst_key_setexternal(dst_key_t *key, isc_boolean_t value) {
++	key->external = value;
++}
++
++isc_boolean_t
++dst_key_isexternal(dst_key_t *key) {
++	return (key->external);
++}
++
+ isc_result_t
+ dst_key_fromfile(dns_name_t *name, dns_keytag_t id,
+ 		 unsigned int alg, int type, const char *directory,
+diff --git a/lib/dns/dst_internal.h b/lib/dns/dst_internal.h
+index 48ce9b8..49ca424 100644
+--- a/lib/dns/dst_internal.h
++++ b/lib/dns/dst_internal.h
+@@ -128,6 +128,7 @@ struct dst_key {
+ 	isc_boolean_t	numset[DST_MAX_NUMERIC + 1]; /*%< data set? */
+ 	isc_boolean_t 	inactive;      /*%< private key not present as it is
+ 					    inactive */
++	isc_boolean_t 	external;      /*%< external key */
+ 
+ 	int		fmt_major;     /*%< private key format, major version */
+ 	int		fmt_minor;     /*%< private key format, minor version */
+diff --git a/lib/dns/dst_parse.c b/lib/dns/dst_parse.c
+index ca43cb3..6348cc1 100644
+--- a/lib/dns/dst_parse.c
++++ b/lib/dns/dst_parse.c
+@@ -178,14 +178,18 @@ find_numericdata(const char *s) {
+ }
+ 
+ static int
+-check_rsa(const dst_private_t *priv) {
++check_rsa(const dst_private_t *priv, isc_boolean_t external) {
+ 	int i, j;
+ 	isc_boolean_t have[RSA_NTAGS];
+ 	isc_boolean_t ok;
+ 	unsigned int mask;
+ 
++	if (external)
++		return ((priv->nelements == 0) ? 0 : -1);
++
+ 	for (i = 0; i < RSA_NTAGS; i++)
+ 		have[i] = ISC_FALSE;
++
+ 	for (j = 0; j < priv->nelements; j++) {
+ 		for (i = 0; i < RSA_NTAGS; i++)
+ 			if (priv->elements[j].tag == TAG(DST_ALG_RSAMD5, i))
+@@ -231,10 +235,15 @@ check_dh(const dst_private_t *priv) {
+ }
+ 
+ static int
+-check_dsa(const dst_private_t *priv) {
++check_dsa(const dst_private_t *priv, isc_boolean_t external) {
+ 	int i, j;
++
++	if (external)
++		return ((priv->nelements == 0)? 0 : -1);
++
+ 	if (priv->nelements != DSA_NTAGS)
+ 		return (-1);
++
+ 	for (i = 0; i < DSA_NTAGS; i++) {
+ 		for (j = 0; j < priv->nelements; j++)
+ 			if (priv->elements[j].tag == TAG(DST_ALG_DSA, i))
+@@ -246,7 +255,11 @@ check_dsa(const dst_private_t *priv) {
+ }
+ 
+ static int
+-check_gost(const dst_private_t *priv) {
++check_gost(const dst_private_t *priv, isc_boolean_t external) {
++
++	if (external)
++		return ((priv->nelements == 0)? 0 : -1);
++
+ 	if (priv->nelements != GOST_NTAGS)
+ 		return (-1);
+ 	if (priv->elements[0].tag != TAG(DST_ALG_ECCGOST, 0))
+@@ -255,7 +268,11 @@ check_gost(const dst_private_t *priv) {
+ }
+ 
+ static int
+-check_ecdsa(const dst_private_t *priv) {
++check_ecdsa(const dst_private_t *priv, isc_boolean_t external) {
++
++	if (external)
++		return ((priv->nelements == 0) ? 0 : -1);
++
+ 	if (priv->nelements != ECDSA_NTAGS)
+ 		return (-1);
+ 	if (priv->elements[0].tag != TAG(DST_ALG_ECDSA256, 0))
+@@ -309,7 +326,7 @@ check_hmac_sha(const dst_private_t *priv, unsigned int ntags,
+ 
+ static int
+ check_data(const dst_private_t *priv, const unsigned int alg,
+-	   isc_boolean_t old)
++	   isc_boolean_t old, isc_boolean_t external)
+ {
+ 	/* XXXVIX this switch statement is too sparse to gen a jump table. */
+ 	switch (alg) {
+@@ -318,17 +335,17 @@ check_data(const dst_private_t *priv, const unsigned int alg,
+ 	case DST_ALG_NSEC3RSASHA1:
+ 	case DST_ALG_RSASHA256:
+ 	case DST_ALG_RSASHA512:
+-		return (check_rsa(priv));
++		return (check_rsa(priv, external));
+ 	case DST_ALG_DH:
+ 		return (check_dh(priv));
+ 	case DST_ALG_DSA:
+ 	case DST_ALG_NSEC3DSA:
+-		return (check_dsa(priv));
++		return (check_dsa(priv, external));
+ 	case DST_ALG_ECCGOST:
+-		return (check_gost(priv));
++		return (check_gost(priv, external));
+ 	case DST_ALG_ECDSA256:
+ 	case DST_ALG_ECDSA384:
+-		return (check_ecdsa(priv));
++		return (check_ecdsa(priv, external));
+ 	case DST_ALG_HMACMD5:
+ 		return (check_hmac_md5(priv, old));
+ 	case DST_ALG_HMACSHA1:
+@@ -372,6 +389,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
+ 	unsigned int opt = ISC_LEXOPT_EOL;
+ 	isc_stdtime_t when;
+ 	isc_result_t ret;
++	isc_boolean_t external = ISC_FALSE;
+ 
+ 	REQUIRE(priv != NULL);
+ 
+@@ -467,9 +485,15 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
+ 
+ 		if (token.type != isc_tokentype_string) {
+ 			ret = DST_R_INVALIDPRIVATEKEY;
++			NEXTTOKEN(lex, opt, &token);
+ 			goto fail;
+ 		}
+ 
++		if (strcmp(DST_AS_STR(token), "External:") == 0) {
++			external = ISC_TRUE;
++			goto next;
++		}
++
+ 		/* Numeric metadata */
+ 		tag = find_numericdata(DST_AS_STR(token));
+ 		if (tag >= 0) {
+@@ -534,8 +558,14 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
+ 		READLINE(lex, opt, &token);
+ 		data = NULL;
+ 	}
++
+  done:
+-	check = check_data(priv, alg, ISC_TRUE);
++	if (external && priv->nelements != 0) {
++		ret = DST_R_INVALIDPRIVATEKEY;
++		goto fail;
++	}
++
++	check = check_data(priv, alg, ISC_TRUE, external);
+ 	if (check < 0) {
+ 		ret = DST_R_INVALIDPRIVATEKEY;
+ 		goto fail;
+@@ -544,6 +574,8 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
+ 		goto fail;
+ 	}
+ 
++	key->external = external;
++
+ 	return (ISC_R_SUCCESS);
+ 
+ fail:
+@@ -573,7 +605,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
+ 
+ 	REQUIRE(priv != NULL);
+ 
+-	ret = check_data(priv, dst_key_alg(key), ISC_FALSE);
++	ret = check_data(priv, dst_key_alg(key), ISC_FALSE, key->external);
+ 	if (ret < 0)
+ 		return (DST_R_INVALIDPRIVATEKEY);
+ 	else if (ret != ISC_R_SUCCESS)
+@@ -691,6 +723,9 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
+ 	       fprintf(fp, "%s %.*s\n", s, (int)r.length, r.base);
+ 	}
+ 
++	if (key->external)
++	       fprintf(fp, "External:\n");
++
+ 	/* Add the metadata tags */
+ 	if (major > 1 || (major == 1 && minor >= 3)) {
+ 		for (i = 0; i < NUMERIC_NTAGS; i++) {
+@@ -706,14 +741,14 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
+ 
+ 			isc_buffer_init(&b, buffer, sizeof(buffer));
+ 			result = dns_time32_totext(when, &b);
+-		       if (result != ISC_R_SUCCESS) {
++			if (result != ISC_R_SUCCESS) {
+ 			       fclose(fp);
+ 			       return (DST_R_INVALIDPRIVATEKEY);
+-		       }
++			}
+ 
+ 			isc_buffer_usedregion(&b, &r);
+ 
+-		       fprintf(fp, "%s %.*s\n", timetags[i], (int)r.length,
++			fprintf(fp, "%s %.*s\n", timetags[i], (int)r.length,
+ 				r.base);
+ 		}
+ 	}
+diff --git a/lib/dns/dst_result.c b/lib/dns/dst_result.c
+index 297e809..30aa1fa 100644
+--- a/lib/dns/dst_result.c
++++ b/lib/dns/dst_result.c
+@@ -35,7 +35,7 @@ static const char *text[DST_R_NRESULTS] = {
+ 	"illegal operation for a null key",	/*%< 3 */
+ 	"public key is invalid",		/*%< 4 */
+ 	"private key is invalid",		/*%< 5 */
+-	"UNUSED6",				/*%< 6 */
++	"external key",				/*%< 6 */
+ 	"error occurred writing key to disk",	/*%< 7 */
+ 	"invalid algorithm specific parameter",	/*%< 8 */
+ 	"UNUSED9",				/*%< 9 */
+diff --git a/lib/dns/include/dns/master.h b/lib/dns/include/dns/master.h
+index 6abcb7e..931e930 100644
+--- a/lib/dns/include/dns/master.h
++++ b/lib/dns/include/dns/master.h
+@@ -57,6 +57,7 @@
+ 
+ #define DNS_MASTER_RESIGN	0x00002000
+ #define DNS_MASTER_KEY	 	0x00004000	/*%< Loading a key zone master file. */
++#define DNS_MASTER_NOTTL	0x00008000	/*%< Don't require ttl. */
+ 
+ ISC_LANG_BEGINDECLS
+ 
+diff --git a/lib/dns/include/dst/dst.h b/lib/dns/include/dst/dst.h
+index 6ce3a0c..8676d1a 100644
+--- a/lib/dns/include/dst/dst.h
++++ b/lib/dns/include/dst/dst.h
+@@ -953,6 +953,12 @@ dst_key_setinactive(dst_key_t *key, isc_boolean_t inactive);
+  *	'key' to be valid.
+  */
+ 
++void
++dst_key_setexternal(dst_key_t *key, isc_boolean_t value);
++
++isc_boolean_t
++dst_key_isexternal(dst_key_t *key);
++
+ ISC_LANG_ENDDECLS
+ 
+ #endif /* DST_DST_H */
+diff --git a/lib/dns/master.c b/lib/dns/master.c
+index aa8f1ac..1a2c84a 100644
+--- a/lib/dns/master.c
++++ b/lib/dns/master.c
+@@ -592,9 +592,9 @@ loadctx_create(dns_masterformat_t format, isc_mem_t *mctx,
+ 		isc_lex_setcomments(lctx->lex, ISC_LEXCOMMENT_DNSMASTERFILE);
+ 	}
+ 
+-	lctx->ttl_known = ISC_FALSE;
++	lctx->ttl_known = ISC_TF((options & DNS_MASTER_NOTTL) != 0);
+ 	lctx->ttl = 0;
+-	lctx->default_ttl_known = ISC_FALSE;
++	lctx->default_ttl_known = lctx->ttl_known;
+ 	lctx->default_ttl = 0;
+ 	lctx->warn_1035 = ISC_TRUE;	/* XXX Argument? */
+ 	lctx->warn_tcr = ISC_TRUE;	/* XXX Argument? */
+diff --git a/lib/dns/openssldsa_link.c b/lib/dns/openssldsa_link.c
+index 8bea1c0..a24baae 100644
+--- a/lib/dns/openssldsa_link.c
++++ b/lib/dns/openssldsa_link.c
+@@ -522,6 +522,11 @@ openssldsa_tofile(const dst_key_t *key, const char *directory) {
+ 
+ 	if (key->keydata.dsa == NULL)
+ 		return (DST_R_NULLKEY);
++	
++	if (key->external) {
++		priv.nelements = 0;
++		return (dst__privstruct_writefile(key, &priv, directory));
++	}
+ 
+ 	dsa = key->keydata.dsa;
+ 
+@@ -569,6 +574,7 @@ openssldsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ #define DST_RET(a) {ret = a; goto err;}
+ 
+ 	UNUSED(pub);
++
+ 	/* read private key file */
+ 	ret = dst__privstruct_parse(key, DST_ALG_DSA, lexer, mctx, &priv);
+ 	if (ret != ISC_R_SUCCESS)
+@@ -607,6 +613,19 @@ openssldsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	}
+ 	dst__privstruct_free(&priv, mctx);
+ 
++	if (key->external) {
++		if (pub == NULL)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		dsa->q = pub->keydata.dsa->q;
++		pub->keydata.dsa->q = NULL;
++		dsa->p = pub->keydata.dsa->p;
++		pub->keydata.dsa->p = NULL;
++		dsa->g = pub->keydata.dsa->g;
++		pub->keydata.dsa->g =  NULL;
++		dsa->pub_key = pub->keydata.dsa->pub_key;
++		pub->keydata.dsa->pub_key = NULL;
++	}
++
+ 	key->key_size = BN_num_bits(dsa->p);
+ 
+ 	return (ISC_R_SUCCESS);
+diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
+index c3f5061..7eff9a0 100644
+--- a/lib/dns/opensslecdsa_link.c
++++ b/lib/dns/opensslecdsa_link.c
+@@ -453,6 +453,11 @@ opensslecdsa_tofile(const dst_key_t *key, const char *directory) {
+ 	if (key->keydata.pkey == NULL)
+ 		return (DST_R_NULLKEY);
+ 
++	if (key->external) {
++		priv.nelements = 0;
++		return (dst__privstruct_writefile(key, &priv, directory));
++	}
++
+ 	pkey = key->keydata.pkey;
+ 	eckey = EVP_PKEY_get1_EC_KEY(pkey);
+ 	if (eckey == NULL)
+@@ -514,8 +519,9 @@ static isc_result_t
+ opensslecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	dst_private_t priv;
+ 	isc_result_t ret;
+-	EVP_PKEY *pkey;
+-	EC_KEY *eckey = NULL;
++	EVP_PKEY *pkey, *pubpkey;
++	EC_KEY *eckey = NULL, *pubeckey = NULL;
++	const EC_POINT *pubkey;
+ 	BIGNUM *privkey;
+ 	int group_nid;
+ 	isc_mem_t *mctx = key->mctx;
+@@ -537,17 +543,36 @@ opensslecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	if (ret != ISC_R_SUCCESS)
+ 		goto err;
+ 
+-	privkey = BN_bin2bn(priv.elements[0].data,
+-			    priv.elements[0].length, NULL);
+-	if (privkey == NULL)
+-		DST_RET(ISC_R_NOMEMORY);
+-	if (!EC_KEY_set_private_key(eckey, privkey))
+-		DST_RET(ISC_R_NOMEMORY);
+-	if (ecdsa_check(eckey, pub) != ISC_R_SUCCESS)
+-		DST_RET(DST_R_INVALIDPRIVATEKEY);
+-	dst__privstruct_free(&priv, mctx);
+-	memset(&priv, 0, sizeof(priv));
+-
++	if (key->external) {
++		/*
++		 * Copy the public key to this new key.
++		 */
++		if (pub == NULL)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		pubpkey = pub->keydata.pkey;
++		pubeckey = EVP_PKEY_get1_EC_KEY(pubpkey);
++		if (pubeckey == NULL)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		pubkey = EC_KEY_get0_public_key(pubeckey);
++		if (pubkey == NULL)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		if (EC_KEY_set_public_key(eckey, pubkey) != 1)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		if (EC_KEY_check_key(eckey) != 1)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++	} else {
++		privkey = BN_bin2bn(priv.elements[0].data,
++				    priv.elements[0].length, NULL);
++		if (privkey == NULL)
++			DST_RET(ISC_R_NOMEMORY);
++		if (!EC_KEY_set_private_key(eckey, privkey))
++			DST_RET(ISC_R_NOMEMORY);
++		if (ecdsa_check(eckey, pub) != ISC_R_SUCCESS)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		dst__privstruct_free(&priv, mctx);
++		memset(&priv, 0, sizeof(priv));
++	}
++ 
+ 	pkey = EVP_PKEY_new();
+ 	if (pkey == NULL)
+ 		DST_RET (ISC_R_NOMEMORY);
+@@ -561,6 +586,8 @@ opensslecdsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+  err:
+ 	if (eckey != NULL)
+ 		EC_KEY_free(eckey);
++	if (pubeckey != NULL)
++		EC_KEY_free(pubeckey);
+ 	dst__privstruct_free(&priv, mctx);
+ 	memset(&priv, 0, sizeof(priv));
+ 	return (ret);
+diff --git a/lib/dns/opensslgost_link.c b/lib/dns/opensslgost_link.c
+index 1ce4405..325a7c0 100644
+--- a/lib/dns/opensslgost_link.c
++++ b/lib/dns/opensslgost_link.c
+@@ -296,6 +296,11 @@ opensslgost_tofile(const dst_key_t *key, const char *directory) {
+ 	if (key->keydata.pkey == NULL)
+ 		return (DST_R_NULLKEY);
+ 
++	if (key->external) {
++		priv.nelements = 0;
++		return (dst__privstruct_writefile(key, &priv, directory));
++	}
++
+ 	pkey = key->keydata.pkey;
+ 
+ 	len = i2d_PrivateKey(pkey, NULL);
+@@ -337,13 +342,21 @@ opensslgost_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	if (ret != ISC_R_SUCCESS)
+ 		return (ret);
+ 
+-	INSIST(priv.elements[0].tag == TAG_GOST_PRIVASN1);
+-	p = priv.elements[0].data;
+-	if (d2i_PrivateKey(NID_id_GostR3410_2001, &pkey, &p,
+-			   (long) priv.elements[0].length) == NULL)
+-		DST_RET(dst__openssl_toresult2("d2i_PrivateKey",
+-					       DST_R_INVALIDPRIVATEKEY));
+-	key->keydata.pkey = pkey;
++	if (key->external) {
++		INSIST(priv.nelements == 0);
++		if (pub == NULL)
++			DST_RET(DST_R_INVALIDPRIVATEKEY);
++		key->keydata.pkey = pub->keydata.pkey;
++		pub->keydata.pkey = NULL;
++	} else {
++		INSIST(priv.elements[0].tag == TAG_GOST_PRIVASN1);
++		p = priv.elements[0].data;
++		if (d2i_PrivateKey(NID_id_GostR3410_2001, &pkey, &p,
++				   (long) priv.elements[0].length) == NULL)
++			DST_RET(dst__openssl_toresult2("d2i_PrivateKey",
++						     DST_R_INVALIDPRIVATEKEY));
++		key->keydata.pkey = pkey;
++	}
+ 	key->key_size = EVP_PKEY_bits(pkey);
+ 	dst__privstruct_free(&priv, mctx);
+ 	memset(&priv, 0, sizeof(priv));
+diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
+index fa7412c..894c7ae 100644
+--- a/lib/dns/opensslrsa_link.c
++++ b/lib/dns/opensslrsa_link.c
+@@ -1048,8 +1048,14 @@ opensslrsa_tofile(const dst_key_t *key, const char *directory) {
+ 		return (DST_R_NULLKEY);
+ 	rsa = key->keydata.rsa;
+ #endif
+-
+ 	memset(bufs, 0, sizeof(bufs));
++
++	if (key->external) {
++		priv.nelements = 0;
++		result = dst__privstruct_writefile(key, &priv, directory);
++		goto fail;
++	}
++
+ 	for (i = 0; i < 8; i++) {
+ 		bufs[i] = isc_mem_get(key->mctx, BN_num_bytes(rsa->n));
+ 		if (bufs[i] == NULL) {
+@@ -1205,6 +1211,9 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 	if (ret != ISC_R_SUCCESS)
+ 		goto err;
+ 
++	if (key->external && priv.nelements != 0)
++		DST_RET(DST_R_INVALIDPRIVATEKEY);
++
+ 	for (i = 0; i < priv.nelements; i++) {
+ 		switch (priv.elements[i].tag) {
+ 		case TAG_RSA_ENGINE:
+@@ -1217,6 +1226,7 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 			break;
+ 		}
+ 	}
++
+ 	/*
+ 	 * Is this key is stored in a HSM?
+ 	 * See if we can fetch it.
+@@ -1328,8 +1338,10 @@ opensslrsa_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+ 
+ 	if (rsa_check(rsa, pubrsa) != ISC_R_SUCCESS)
+ 		DST_RET(DST_R_INVALIDPRIVATEKEY);
+-	if (BN_num_bits(rsa->e) > RSA_MAX_PUBEXP_BITS)
+-		DST_RET(ISC_R_RANGE);
++	if (!key->external) {
++		if (BN_num_bits(rsa->e) > RSA_MAX_PUBEXP_BITS)
++			DST_RET(ISC_R_RANGE);
++	}
+ 	key->key_size = BN_num_bits(rsa->n);
+ 	if (pubrsa != NULL)
+ 		RSA_free(pubrsa);
+diff --git a/lib/dns/zone.c b/lib/dns/zone.c
+index daf495b..b82ad58 100644
+--- a/lib/dns/zone.c
++++ b/lib/dns/zone.c
+@@ -5545,6 +5545,7 @@ find_zone_keys(dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *ver,
+ 	const char *directory = dns_zone_getkeydirectory(zone);
+ 
+ 	CHECK(dns_db_findnode(db, dns_db_origin(db), ISC_FALSE, &node));
++	memset(keys, 0, sizeof(*keys) * maxkeys);
+ 	result = dns_dnssec_findzonekeys2(db, ver, node, dns_db_origin(db),
+ 					  directory, mctx, maxkeys, keys,
+ 					  nkeys);
+@@ -13132,6 +13133,7 @@ sync_secure_db(dns_zone_t *seczone, dns_db_t *secdb,
+ 
+ static void
+ receive_secure_serial(isc_task_t *task, isc_event_t *event) {
++	static char me[] = "receive_secure_serial";
+ 	isc_result_t result;
+ 	dns_journal_t *rjournal = NULL;
+ 	isc_uint32_t start, end;
+@@ -13147,6 +13149,8 @@ receive_secure_serial(isc_task_t *task, isc_event_t *event) {
+ 	end = ((struct secure_event *)event)->serial;
+ 	isc_event_free(&event);
+ 
++	ENTER;
++
+ 	LOCK_ZONE(zone);
+ 
+ 	dns_diff_init(zone->mctx, &diff);
+-- 
+1.9.3
+

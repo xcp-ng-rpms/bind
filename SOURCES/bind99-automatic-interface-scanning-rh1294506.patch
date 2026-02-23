@@ -1,0 +1,685 @@
+From 5013230b31da1d94ce5682e5c5c38011da744971 Mon Sep 17 00:00:00 2001
+From: Tomas Hozza <thozza@redhat.com>
+Date: Wed, 11 May 2016 15:17:55 +0200
+Subject: [PATCH] Added support for automatic interface scan when new address
+ is assigned to any interface
+
+Signed-off-by: Tomas Hozza <thozza@redhat.com>
+---
+ bin/named/config.c                |   1 +
+ bin/named/control.c               |   3 +
+ bin/named/include/named/control.h |   1 +
+ bin/named/include/named/server.h  |   8 +++
+ bin/named/interfacemgr.c          | 144 ++++++++++++++++++++++++++++++++++++++
+ bin/named/named.conf.docbook      |   1 +
+ bin/named/server.c                |  31 +++++++-
+ bin/named/statschannel.c          |   5 ++
+ bin/rndc/rndc.c                   |   1 +
+ bin/rndc/rndc.docbook             |  12 ++++
+ config.h.in                       |  12 ++++
+ configure.in                      |   5 +-
+ doc/arm/Bv9ARM-book.xml           |  22 +++++-
+ lib/isc/include/isc/socket.h      |  10 ++-
+ lib/isc/unix/socket.c             |  59 ++++++++++++++++
+ lib/isccfg/namedconf.c            |   1 +
+ 16 files changed, 310 insertions(+), 6 deletions(-)
+
+diff --git a/bin/named/config.c b/bin/named/config.c
+index f6d0263..b43c0fc 100644
+--- a/bin/named/config.c
++++ b/bin/named/config.c
+@@ -52,6 +52,7 @@
+ /*% default configuration */
+ static char defaultconf[] = "\
+ options {\n\
++	automatic-interface-scan yes;\n\
+ #	blackhole {none;};\n"
+ #ifndef WIN32
+ "	coresize default;\n\
+diff --git a/bin/named/control.c b/bin/named/control.c
+index 06eadce..86fa691 100644
+--- a/bin/named/control.c
++++ b/bin/named/control.c
+@@ -185,6 +185,9 @@ ns_control_docommand(isccc_sexpr_t *message, isc_buffer_t *text) {
+ 		   command_compare(command, NS_COMMAND_THAW)) {
+ 		result = ns_server_freeze(ns_g_server, ISC_FALSE, command,
+ 					  text);
++	} else if (command_compare(command, NS_COMMAND_SCAN)) {
++		result = ISC_R_SUCCESS;
++		ns_server_scan_interfaces(ns_g_server);
+ 	} else if (command_compare(command, NS_COMMAND_SYNC)) {
+ 		result = ns_server_sync(ns_g_server, command, text);
+ 	} else if (command_compare(command, NS_COMMAND_RECURSING)) {
+diff --git a/bin/named/include/named/control.h b/bin/named/include/named/control.h
+index d730a83..52ed583 100644
+--- a/bin/named/include/named/control.h
++++ b/bin/named/include/named/control.h
+@@ -59,6 +59,7 @@
+ #define NS_COMMAND_NULL		"null"
+ #define NS_COMMAND_NOTIFY	"notify"
+ #define NS_COMMAND_VALIDATION	"validation"
++#define NS_COMMAND_SCAN 	"scan"
+ #define NS_COMMAND_SIGN 	"sign"
+ #define NS_COMMAND_LOADKEYS 	"loadkeys"
+ #define NS_COMMAND_ADDZONE	"addzone"
+diff --git a/bin/named/include/named/server.h b/bin/named/include/named/server.h
+index ff0bfd3..83622f4 100644
+--- a/bin/named/include/named/server.h
++++ b/bin/named/include/named/server.h
+@@ -37,6 +37,7 @@
+ #define NS_EVENTCLASS		ISC_EVENTCLASS(0x4E43)
+ #define NS_EVENT_RELOAD		(NS_EVENTCLASS + 0)
+ #define NS_EVENT_CLIENTCONTROL	(NS_EVENTCLASS + 1)
++#define NS_EVENT_IFSCAN		(NS_EVENTCLASS + 2)
+ 
+ /*%
+  * Name server state.  Better here than in lots of separate global variables.
+@@ -114,6 +115,7 @@ struct ns_server {
+ 	dns_name_t		*session_keyname;
+ 	unsigned int		session_keyalg;
+ 	isc_uint16_t		session_keybits;
++	isc_boolean_t		interface_auto;
+ };
+ 
+ #define NS_SERVER_MAGIC			ISC_MAGIC('S','V','E','R')
+@@ -201,6 +203,12 @@ ns_server_reloadwanted(ns_server_t *server);
+  */
+ 
+ void
++ns_server_scan_interfaces(ns_server_t *server);
++/*%<
++ * Trigger a interface scan.
++ */
++
++void
+ ns_server_flushonshutdown(ns_server_t *server, isc_boolean_t flush);
+ /*%<
+  * Inform the server that the zones should be flushed to disk on shutdown.
+diff --git a/bin/named/interfacemgr.c b/bin/named/interfacemgr.c
+index 4f6b0f3..a9aa4a4 100644
+--- a/bin/named/interfacemgr.c
++++ b/bin/named/interfacemgr.c
+@@ -33,6 +33,28 @@
+ #include <named/client.h>
+ #include <named/log.h>
+ #include <named/interfacemgr.h>
++#include <named/server.h>
++
++#ifdef HAVE_NET_ROUTE_H
++#include <net/route.h>
++#if defined(RTM_VERSION) && defined(RTM_NEWADDR) && defined(RTM_DELADDR)
++#define USE_ROUTE_SOCKET 1
++#define ROUTE_SOCKET_PROTOCOL PF_ROUTE
++#define MSGHDR rt_msghdr
++#define MSGTYPE rtm_type
++#endif
++#endif
++
++#if defined(HAVE_LINUX_NETLINK_H) && defined(HAVE_LINUX_RTNETLINK_H)
++#include <linux/netlink.h>
++#include <linux/rtnetlink.h>
++#if defined(RTM_NEWADDR) && defined(RTM_DELADDR)
++#define USE_ROUTE_SOCKET 1
++#define ROUTE_SOCKET_PROTOCOL PF_NETLINK
++#define MSGHDR nlmsghdr
++#define MSGTYPE nlmsg_type
++#endif
++#endif
+ 
+ #define IFMGR_MAGIC			ISC_MAGIC('I', 'F', 'M', 'G')
+ #define NS_INTERFACEMGR_VALID(t)	ISC_MAGIC_VALID(t, IFMGR_MAGIC)
+@@ -55,6 +77,11 @@ struct ns_interfacemgr {
+ 	dns_aclenv_t		aclenv;		/*%< Localhost/localnets ACLs */
+ 	ISC_LIST(ns_interface_t) interfaces;	/*%< List of interfaces. */
+ 	ISC_LIST(isc_sockaddr_t) listenon;
++#ifdef USE_ROUTE_SOCKET
++	isc_task_t *		task;
++	isc_socket_t *		route;
++	unsigned char		buf[2048];
++#endif
+ };
+ 
+ static void
+@@ -63,6 +90,71 @@ purge_old_interfaces(ns_interfacemgr_t *mgr);
+ static void
+ clearlistenon(ns_interfacemgr_t *mgr);
+ 
++#ifdef USE_ROUTE_SOCKET
++static void
++route_event(isc_task_t *task, isc_event_t *event) {
++	isc_socketevent_t *sevent = NULL;
++	ns_interfacemgr_t *mgr = NULL;
++	isc_region_t r;
++	isc_result_t result;
++	struct MSGHDR *rtm;
++
++	UNUSED(task);
++
++	REQUIRE(event->ev_type == ISC_SOCKEVENT_RECVDONE);
++	mgr = event->ev_arg;
++	sevent = (isc_socketevent_t *)event;
++
++	if (sevent->result != ISC_R_SUCCESS) {
++		if (sevent->result != ISC_R_CANCELED)
++			isc_log_write(IFMGR_COMMON_LOGARGS, ISC_LOG_ERROR,
++				      "automatic interface scanning "
++				      "terminated: %s",
++				      isc_result_totext(sevent->result));
++		ns_interfacemgr_detach(&mgr);
++		isc_event_free(&event);
++		return;
++	}
++
++	rtm = (struct MSGHDR *)mgr->buf;
++#ifdef RTM_VERSION
++	if (rtm->rtm_version != RTM_VERSION) {
++		isc_log_write(IFMGR_COMMON_LOGARGS, ISC_LOG_ERROR,
++			      "automatic interface rescanning disabled: "
++			      "rtm->rtm_version mismatch (%u != %u) "
++			      "recompile required", rtm->rtm_version,
++			      RTM_VERSION);
++		isc_task_detach(&mgr->task);
++		isc_socket_detach(&mgr->route);
++		ns_interfacemgr_detach(&mgr);
++		isc_event_free(&event);
++		return;
++	}
++#endif
++
++	switch (rtm->MSGTYPE) {
++	case RTM_NEWADDR:
++	case RTM_DELADDR:
++		if (ns_g_server->interface_auto)
++			ns_server_scan_interfaces(ns_g_server);
++		break;
++	default:
++		break;
++	}
++
++	/*
++	 * Look for next route event.
++	 */
++	r.base = mgr->buf;
++	r.length = sizeof(mgr->buf);
++	result = isc_socket_recv(mgr->route, &r, 1, mgr->task,
++				 route_event, mgr);
++	if (result != ISC_R_SUCCESS)
++		ns_interfacemgr_detach(&mgr);
++	isc_event_free(&event);
++}
++#endif
++
+ isc_result_t
+ ns_interfacemgr_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
+ 		       isc_socketmgr_t *socketmgr,
+@@ -112,11 +204,52 @@ ns_interfacemgr_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
+ 	mgr->aclenv.geoip = ns_g_geoip;
+ #endif
+ 
++#ifdef USE_ROUTE_SOCKET
++	mgr->route = NULL;
++	result = isc_socket_create(mgr->socketmgr, ROUTE_SOCKET_PROTOCOL,
++				   isc_sockettype_raw, &mgr->route);
++	switch (result) {
++	case ISC_R_NOPERM:
++	case ISC_R_SUCCESS:
++	case ISC_R_NOTIMPLEMENTED:
++	case ISC_R_FAMILYNOSUPPORT:
++	    break;
++	default:
++		goto cleanup_aclenv;
++	}
++
++	mgr->task = NULL;
++	if (mgr->route != NULL) {
++		result = isc_task_create(taskmgr, 0, &mgr->task);
++		if (result != ISC_R_SUCCESS)
++			goto cleanup_route;
++	}
++	mgr->references = (mgr->route != NULL) ? 2 : 1;
++#else
+ 	mgr->references = 1;
++#endif
+ 	mgr->magic = IFMGR_MAGIC;
+ 	*mgrp = mgr;
++
++#ifdef USE_ROUTE_SOCKET
++	if (mgr->route != NULL) {
++		isc_region_t r = { mgr->buf, sizeof(mgr->buf) };
++
++		result = isc_socket_recv(mgr->route, &r, 1, mgr->task,
++					 route_event, mgr);
++		if (result != ISC_R_SUCCESS)
++			ns_interfacemgr_detach(&mgr);
++	}
++#endif
+ 	return (ISC_R_SUCCESS);
+ 
++#ifdef USE_ROUTE_SOCKET
++ cleanup_route:
++	if (mgr->route != NULL)
++		isc_socket_detach(&mgr->route);
++ cleanup_aclenv:
++	dns_aclenv_destroy(&mgr->aclenv);
++#endif
+  cleanup_listenon:
+ 	ns_listenlist_detach(&mgr->listenon4);
+ 	ns_listenlist_detach(&mgr->listenon6);
+@@ -128,6 +261,13 @@ ns_interfacemgr_create(isc_mem_t *mctx, isc_taskmgr_t *taskmgr,
+ static void
+ ns_interfacemgr_destroy(ns_interfacemgr_t *mgr) {
+ 	REQUIRE(NS_INTERFACEMGR_VALID(mgr));
++
++#ifdef USE_ROUTE_SOCKET
++	if (mgr->route != NULL)
++		isc_socket_detach(&mgr->route);
++	if (mgr->task != NULL)
++		isc_task_detach(&mgr->task);
++#endif
+ 	dns_aclenv_destroy(&mgr->aclenv);
+ 	ns_listenlist_detach(&mgr->listenon4);
+ 	ns_listenlist_detach(&mgr->listenon6);
+@@ -179,6 +319,10 @@ ns_interfacemgr_shutdown(ns_interfacemgr_t *mgr) {
+ 	 * consider all interfaces "old".
+ 	 */
+ 	mgr->generation++;
++#ifdef USE_ROUTE_SOCKET
++	if (mgr->route != NULL)
++		isc_socket_cancel(mgr->route, mgr->task, ISC_SOCKCANCEL_RECV);
++#endif
+ 	purge_old_interfaces(mgr);
+ }
+ 
+diff --git a/bin/named/named.conf.docbook b/bin/named/named.conf.docbook
+index 8c23e52..a8cd31e 100644
+--- a/bin/named/named.conf.docbook
++++ b/bin/named/named.conf.docbook
+@@ -373,6 +373,7 @@ options {
+ 	zero-no-soa-ttl <replaceable>boolean</replaceable>;
+ 	zero-no-soa-ttl-cache <replaceable>boolean</replaceable>;
+ 	dnssec-secure-to-insecure <replaceable>boolean</replaceable>;
++	automatic-interface-scan <replaceable>boolean</replaceable>;
+ 	deny-answer-addresses {
+ 		<replaceable>address_match_list</replaceable>
+ 	} <optional> except-from { <replaceable>namelist</replaceable> } </optional>;
+diff --git a/bin/named/server.c b/bin/named/server.c
+index 24b31c3..942bab6 100644
+--- a/bin/named/server.c
++++ b/bin/named/server.c
+@@ -4485,8 +4485,9 @@ adjust_interfaces(ns_server_t *server, isc_mem_t *mctx) {
+ }
+ 
+ /*
+- * This event callback is invoked to do periodic network
+- * interface scanning.
++ * This event callback is invoked to do periodic network interface
++ * scanning.  It is also called by ns_server_scan_interfaces(),
++ * invoked by "rndc scan"
+  */
+ static void
+ interface_timer_tick(isc_task_t *task, isc_event_t *event) {
+@@ -4494,7 +4495,14 @@ interface_timer_tick(isc_task_t *task, isc_event_t *event) {
+ 	ns_server_t *server = (ns_server_t *) event->ev_arg;
+ 	INSIST(task == server->task);
+ 	UNUSED(task);
++
++	if (event->ev_type == NS_EVENT_IFSCAN)
++		isc_log_write(ns_g_lctx, NS_LOGCATEGORY_GENERAL,
++			      NS_LOGMODULE_SERVER, ISC_LOG_DEBUG(1),
++			      "automatic interface rescan");
++
+ 	isc_event_free(&event);
++
+ 	/*
+ 	 * XXX should scan interfaces unlocked and get exclusive access
+ 	 * only to replace ACLs.
+@@ -5419,6 +5427,14 @@ load_configuration(const char *filename, ns_server_t *server,
+ 	server->interface_interval = interface_interval;
+ 
+ 	/*
++	 * Enable automatic interface scans.
++	 */
++	obj = NULL;
++	result = ns_config_get(maps, "automatic-interface-scan", &obj);
++	INSIST(result == ISC_R_SUCCESS);
++	server->interface_auto = cfg_obj_asboolean(obj);
++
++	/*
+ 	 * Configure the dialup heartbeat timer.
+ 	 */
+ 	obj = NULL;
+@@ -6637,6 +6653,17 @@ ns_server_reloadwanted(ns_server_t *server) {
+ 	UNLOCK(&server->reload_event_lock);
+ }
+ 
++void
++ns_server_scan_interfaces(ns_server_t *server) {
++	isc_event_t *event;
++
++	event = isc_event_allocate(ns_g_mctx, server, NS_EVENT_IFSCAN,
++				   interface_timer_tick, server,
++				   sizeof(isc_event_t));
++	if (event != NULL)
++		isc_task_send(server->task, &event);
++}
++
+ static char *
+ next_token(char **stringp, const char *delim) {
+ 	char *res;
+diff --git a/bin/named/statschannel.c b/bin/named/statschannel.c
+index 37e98a8..b985f62 100644
+--- a/bin/named/statschannel.c
++++ b/bin/named/statschannel.c
+@@ -341,6 +341,7 @@ init_desc(void) {
+ 	SET_SOCKSTATDESC(tcp4open, "TCP/IPv4 sockets opened", "TCP4Open");
+ 	SET_SOCKSTATDESC(tcp6open, "TCP/IPv6 sockets opened", "TCP6Open");
+ 	SET_SOCKSTATDESC(unixopen, "Unix domain sockets opened", "UnixOpen");
++	SET_SOCKSTATDESC(rawopen, "Raw sockets opened", "RawOpen");
+ 	SET_SOCKSTATDESC(udp4openfail, "UDP/IPv4 socket open failures",
+ 			 "UDP4OpenFail");
+ 	SET_SOCKSTATDESC(udp6openfail, "UDP/IPv6 socket open failures",
+@@ -351,6 +352,8 @@ init_desc(void) {
+ 			 "TCP6OpenFail");
+ 	SET_SOCKSTATDESC(unixopenfail, "Unix domain socket open failures",
+ 			 "UnixOpenFail");
++	SET_SOCKSTATDESC(rawopenfail, "Raw socket open failures",
++			 "RawOpenFail");
+ 	SET_SOCKSTATDESC(udp4close, "UDP/IPv4 sockets closed", "UDP4Close");
+ 	SET_SOCKSTATDESC(udp6close, "UDP/IPv6 sockets closed", "UDP6Close");
+ 	SET_SOCKSTATDESC(tcp4close, "TCP/IPv4 sockets closed", "TCP4Close");
+@@ -358,6 +361,7 @@ init_desc(void) {
+ 	SET_SOCKSTATDESC(unixclose, "Unix domain sockets closed", "UnixClose");
+ 	SET_SOCKSTATDESC(fdwatchclose, "FDwatch sockets closed",
+ 			 "FDWatchClose");
++	SET_SOCKSTATDESC(rawclose, "Raw sockets closed", "RawClose");
+ 	SET_SOCKSTATDESC(udp4bindfail, "UDP/IPv4 socket bind failures",
+ 			 "UDP4BindFail");
+ 	SET_SOCKSTATDESC(udp6bindfail, "UDP/IPv6 socket bind failures",
+@@ -424,6 +428,7 @@ init_desc(void) {
+ 			 "UnixRecvErr");
+ 	SET_SOCKSTATDESC(fdwatchrecvfail, "FDwatch recv errors",
+ 			 "FDwatchRecvErr");
++	SET_SOCKSTATDESC(rawrecvfail, "Raw recv errors", "RawRecvErr");
+ 	INSIST(i == isc_sockstatscounter_max);
+ 
+ 	/* Initialize DNSSEC statistics */
+diff --git a/bin/rndc/rndc.c b/bin/rndc/rndc.c
+index 9a007e2..be198b1 100644
+--- a/bin/rndc/rndc.c
++++ b/bin/rndc/rndc.c
+@@ -160,6 +160,7 @@ command is one of the following:\n\
+ 		Add zone to given view. Requires new-zone-file option.\n\
+   delzone [\"file\"] zone [class [view]]\n\
+ 		Removes zone from given view. Requires new-zone-file option.\n\
++  scan		Scan available network interfaces for changes.\n\
+   signing -list zone [class [view]]\n\
+ 		List the private records showing the state of DNSSEC\n\
+ 		signing in the given zone.\n\
+diff --git a/bin/rndc/rndc.docbook b/bin/rndc/rndc.docbook
+index 1789aaa..5b37b7f 100644
+--- a/bin/rndc/rndc.docbook
++++ b/bin/rndc/rndc.docbook
+@@ -330,6 +330,18 @@
+       </varlistentry>
+ 
+       <varlistentry>
++        <term><userinput>scan</userinput></term>
++        <listitem>
++          <para>
++             Scan the list of available network interfaces
++             for changes, without performing a full
++             <command>reconfig</command> or waiting for the
++             <command>interface-interval</command> timer.
++          </para>
++        </listitem>
++      </varlistentry>
++
++      <varlistentry>
+         <term><userinput>sync <optional>-clean</optional> <optional><replaceable>zone</replaceable> <optional><replaceable>class</replaceable> <optional><replaceable>view</replaceable></optional></optional></optional></userinput></term>
+         <listitem>
+           <para>
+diff --git a/config.h.in b/config.h.in
+index 6ed8381..3515f69 100644
+--- a/config.h.in
++++ b/config.h.in
+@@ -280,6 +280,12 @@ int sigwait(const unsigned int *set, int *sig);
+ /* Define to 1 if you have the <linux/capability.h> header file. */
+ #undef HAVE_LINUX_CAPABILITY_H
+ 
++/* Define to 1 if you have the <linux/netlink.h> header file. */
++#undef HAVE_LINUX_NETLINK_H
++
++/* Define to 1 if you have the <linux/rtnetlink.h> header file. */
++#undef HAVE_LINUX_RTNETLINK_H
++
+ /* Define to 1 if you have the <linux/types.h> header file. */
+ #undef HAVE_LINUX_TYPES_H
+ 
+@@ -295,6 +301,9 @@ int sigwait(const unsigned int *set, int *sig);
+ /* Define to 1 if you have the <net/if6.h> header file. */
+ #undef HAVE_NET_IF6_H
+ 
++/* Define to 1 if you have the <net/route.h> header file. */
++#undef HAVE_NET_ROUTE_H
++
+ /* Define if your OpenSSL version supports ECDSA. */
+ #undef HAVE_OPENSSL_ECDSA
+ 
+@@ -358,6 +367,9 @@ int sigwait(const unsigned int *set, int *sig);
+ /* Define to 1 if you have the <sys/select.h> header file. */
+ #undef HAVE_SYS_SELECT_H
+ 
++/* Define to 1 if you have the <sys/socket.h> header file. */
++#undef HAVE_SYS_SOCKET_H
++
+ /* Define to 1 if you have the <sys/sockio.h> header file. */
+ #undef HAVE_SYS_SOCKIO_H
+ 
+diff --git a/configure.in b/configure.in
+index d72093f..38e626d 100644
+--- a/configure.in
++++ b/configure.in
+@@ -375,11 +375,14 @@ fi
+ 
+ AC_HEADER_STDC
+ 
+-AC_CHECK_HEADERS(fcntl.h regex.h sys/time.h unistd.h sys/sockio.h sys/select.h sys/param.h sys/sysctl.h net/if6.h,,,
++AC_CHECK_HEADERS(fcntl.h regex.h sys/time.h unistd.h sys/sockio.h sys/select.h sys/param.h sys/sysctl.h net/if6.h sys/socket.h net/route.h linux/netlink.h linux/rtnetlink.h,,,
+ [$ac_includes_default
+ #ifdef HAVE_SYS_PARAM_H
+ # include <sys/param.h>
+ #endif
++#ifdef HAVE_SYS_SOCKET_H
++# include <sys/socket.h>
++#endif
+ ])
+ 
+ AC_C_CONST
+diff --git a/doc/arm/Bv9ARM-book.xml b/doc/arm/Bv9ARM-book.xml
+index 92c7b72..4c47d92 100644
+--- a/doc/arm/Bv9ARM-book.xml
++++ b/doc/arm/Bv9ARM-book.xml
+@@ -4964,7 +4964,9 @@ badresp:1,adberr:0,findfail:0,valfail:0]
+ 	<optional> policy given | disabled | passthru | nxdomain | nodata | cname <replaceable>domain</replaceable> </optional>
+ 	<optional> recursive-only <replaceable>yes_or_no</replaceable> </optional> <optional> max-policy-ttl <replaceable>number</replaceable> </optional> ;
+     } <optional> recursive-only <replaceable>yes_or_no</replaceable> </optional> <optional> max-policy-ttl <replaceable>number</replaceable> </optional>
+-	<optional> break-dnssec <replaceable>yes_or_no</replaceable> </optional> <optional> min-ns-dots <replaceable>number</replaceable> </optional> ; </optional>
++    <optional> break-dnssec <replaceable>yes_or_no</replaceable> </optional> <optional> min-ns-dots <replaceable>number</replaceable> </optional>
++      <optional> automatic-interface-scan <replaceable>yes_or_no</replaceable> </optional>
++    ; </optional>
+ };
+ </programlisting>
+ 
+@@ -5726,6 +5728,23 @@ options {
+           <variablelist>
+ 
+             <varlistentry>
++	      <term><command>automatic-interface-scan</command></term>
++	      <listitem>
++		<para>
++		  If <userinput>yes</userinput> and supported by the OS,
++		  automatically rescan network interfaces when the interface
++		  addresses are added or removed.  The default is
++		  <userinput>yes</userinput>.
++		</para>
++		<para>
++		  Currently the OS needs to support routing sockets for
++		  <command>automatic-interface-scan</command> to be
++		  supported.
++		</para>
++	      </listitem>
++	    </varlistentry>
++
++	    <varlistentry>
+               <term><command>allow-new-zones</command></term>
+               <listitem>
+                 <para>
+@@ -10494,6 +10513,7 @@ zone <replaceable>zone_name</replaceable> <optional><replaceable>class</replacea
+     <optional> allow-query-on { <replaceable>address_match_list</replaceable> }; </optional>
+     <optional> allow-transfer { <replaceable>address_match_list</replaceable> }; </optional>
+     <optional> allow-update-forwarding { <replaceable>address_match_list</replaceable> }; </optional>
++    <optional> automatic-interface-scan { <replaceable>yes_or_no</replaceable> }; </optional>
+     <optional> dnssec-update-mode ( <replaceable>maintain</replaceable> | <replaceable>no-resign</replaceable> ); </optional>
+     <optional> update-check-ksk <replaceable>yes_or_no</replaceable>; </optional>
+     <optional> dnssec-dnskey-kskonly <replaceable>yes_or_no</replaceable>; </optional>
+diff --git a/lib/isc/include/isc/socket.h b/lib/isc/include/isc/socket.h
+index c5a753a..1cd90bb 100644
+--- a/lib/isc/include/isc/socket.h
++++ b/lib/isc/include/isc/socket.h
+@@ -150,7 +150,12 @@ enum {
+ 	isc_sockstatscounter_unixrecvfail = 50,
+ 	isc_sockstatscounter_fdwatchrecvfail = 51,
+ 
+-	isc_sockstatscounter_max = 52
++	isc_sockstatscounter_rawopen = 52,
++	isc_sockstatscounter_rawopenfail = 53,
++	isc_sockstatscounter_rawclose = 54,
++	isc_sockstatscounter_rawrecvfail = 55,
++
++	isc_sockstatscounter_max = 56
+ };
+ 
+ /***
+@@ -221,7 +226,8 @@ typedef enum {
+ 	isc_sockettype_udp = 1,
+ 	isc_sockettype_tcp = 2,
+ 	isc_sockettype_unix = 3,
+-	isc_sockettype_fdwatch = 4
++	isc_sockettype_fdwatch = 4,
++	isc_sockettype_raw = 5
+ } isc_sockettype_t;
+ 
+ /*@{*/
+diff --git a/lib/isc/unix/socket.c b/lib/isc/unix/socket.c
+index 82d0d16..cbc506b 100644
+--- a/lib/isc/unix/socket.c
++++ b/lib/isc/unix/socket.c
+@@ -28,6 +28,11 @@
+ #include <sys/time.h>
+ #include <sys/uio.h>
+ 
++#if defined(HAVE_LINUX_NETLINK_H) && defined(HAVE_LINUX_RTNETLINK_H)
++#include <linux/netlink.h>
++#include <linux/rtnetlink.h>
++#endif
++
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <stddef.h>
+@@ -708,6 +713,18 @@ static const isc_statscounter_t fdwatchstatsindex[] = {
+ 	isc_sockstatscounter_fdwatchsendfail,
+ 	isc_sockstatscounter_fdwatchrecvfail
+ };
++static const isc_statscounter_t rawstatsindex[] = {
++	isc_sockstatscounter_rawopen,
++	isc_sockstatscounter_rawopenfail,
++	isc_sockstatscounter_rawclose,
++	-1,
++	-1,
++	-1,
++	-1,
++	-1,
++	-1,
++	isc_sockstatscounter_rawrecvfail,
++};
+ 
+ #if defined(USE_KQUEUE) || defined(USE_EPOLL) || defined(USE_DEVPOLL) || \
+     defined(USE_WATCHER_THREAD)
+@@ -1744,6 +1761,7 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
+ 			return (DOIO_EOF);
+ 		break;
+ 	case isc_sockettype_udp:
++	case isc_sockettype_raw:
+ 		break;
+ 	case isc_sockettype_fdwatch:
+ 	default:
+@@ -2306,6 +2324,44 @@ opensocket(isc__socketmgr_t *manager, isc__socket_t *sock,
+ 		case isc_sockettype_unix:
+ 			sock->fd = socket(sock->pf, SOCK_STREAM, 0);
+ 			break;
++		case isc_sockettype_raw:
++			errno = EPFNOSUPPORT;
++			/*
++			 * PF_ROUTE is a alias for PF_NETLINK on linux.
++			 */
++#if defined(PF_ROUTE)
++			if (sock->fd == -1 && sock->pf == PF_ROUTE) {
++#ifdef NETLINK_ROUTE
++				sock->fd = socket(sock->pf, SOCK_RAW,
++						  NETLINK_ROUTE);
++#else
++				sock->fd = socket(sock->pf, SOCK_RAW, 0);
++#endif
++				if (sock->fd != -1) {
++#ifdef NETLINK_ROUTE
++					struct sockaddr_nl sa;
++					int n;
++
++					/*
++					 * Do an implicit bind.
++					 */
++					memset(&sa, 0, sizeof(sa));
++					sa.nl_family = AF_NETLINK;
++					sa.nl_groups = RTMGRP_IPV4_IFADDR |
++						       RTMGRP_IPV6_IFADDR;
++					n = bind(sock->fd,
++						 (struct sockaddr *) &sa,
++						 sizeof(sa));
++					if (n < 0) {
++						close(sock->fd);
++						sock->fd = -1;
++					}
++#endif
++					sock->bound = 1;
++				}
++			}
++ #endif
++			break;
+ 		case isc_sockettype_fdwatch:
+ 			/*
+ 			 * We should not be called for isc_sockettype_fdwatch
+@@ -2602,6 +2658,9 @@ socket_create(isc_socketmgr_t *manager0, int pf, isc_sockettype_t type,
+ 	case isc_sockettype_unix:
+ 		sock->statsindex = unixstatsindex;
+ 		break;
++	case isc_sockettype_raw:
++		sock->statsindex = rawstatsindex;
++		break;
+ 	default:
+ 		INSIST(0);
+ 	}
+diff --git a/lib/isccfg/namedconf.c b/lib/isccfg/namedconf.c
+index f5ff8e3..f49ff70 100644
+--- a/lib/isccfg/namedconf.c
++++ b/lib/isccfg/namedconf.c
+@@ -931,6 +931,7 @@ bindkeys_clauses[] = {
+  */
+ static cfg_clausedef_t
+ options_clauses[] = {
++	{ "automatic-interface-scan", &cfg_type_boolean, 0 },
+ 	{ "avoid-v4-udp-ports", &cfg_type_bracketed_portlist, 0 },
+ 	{ "avoid-v6-udp-ports", &cfg_type_bracketed_portlist, 0 },
+ 	{ "bindkeys-file", &cfg_type_qstring, 0 },
+-- 
+2.5.5
+

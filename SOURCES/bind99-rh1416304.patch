@@ -1,0 +1,139 @@
+From e7a2611c555e03314ac4f7960044b05cce040364 Mon Sep 17 00:00:00 2001
+From: Mark Andrews <marka@isc.org>
+Date: Thu, 31 Jul 2014 11:38:11 +1000
+Subject: [PATCH] 3905. [bug] Address deadlock between view.c and adb.c. [RT
+ #36341]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Original-commit: 5e746ab61ed8158f784b86111fef95581a08b7dd
+Signed-off-by: Petr Menšík <pemensik@redhat.com>
+---
+ lib/dns/adb.c | 57 +++++++++++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 41 insertions(+), 16 deletions(-)
+
+diff --git a/lib/dns/adb.c b/lib/dns/adb.c
+index a6da94d..ac89e66 100644
+--- a/lib/dns/adb.c
++++ b/lib/dns/adb.c
+@@ -15,8 +15,6 @@
+  * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+-/* $Id: adb.c,v 1.264 2011/12/05 17:10:51 each Exp $ */
+-
+ /*! \file
+  *
+  * \note
+@@ -157,7 +155,7 @@ struct dns_adb {
+ 	unsigned int                    *entry_refcnt;
+ 
+ 	isc_event_t                     cevent;
+-	isc_boolean_t                   cevent_sent;
++	isc_boolean_t                   cevent_out;
+ 	isc_boolean_t                   shutting_down;
+ 	isc_eventlist_t                 whenshutdown;
+ 	isc_event_t			growentries;
+@@ -322,6 +320,7 @@ static inline isc_boolean_t unlink_entry(dns_adb_t *, dns_adbentry_t *);
+ static isc_boolean_t kill_name(dns_adbname_t **, isc_eventtype_t);
+ static void water(void *, int);
+ static void dump_entry(FILE *, dns_adbentry_t *, isc_boolean_t, isc_stdtime_t);
++static void shutdown_task(isc_task_t *task, isc_event_t *ev);
+ 
+ /*
+  * MUST NOT overlap DNS_ADBFIND_* flags!
+@@ -1499,10 +1498,13 @@ check_exit(dns_adb_t *adb) {
+ 		 * If there aren't any external references either, we're
+ 		 * done.  Send the control event to initiate shutdown.
+ 		 */
+-		INSIST(!adb->cevent_sent);      /* Sanity check. */
++		INSIST(!adb->cevent_out);      /* Sanity check. */
++		ISC_EVENT_INIT(&adb->cevent, sizeof(adb->cevent), 0, NULL,
++			       DNS_EVENT_ADBCONTROL, shutdown_task, adb,
++			       adb, NULL, NULL);
+ 		event = &adb->cevent;
+ 		isc_task_send(adb->task, &event);
+-		adb->cevent_sent = ISC_TRUE;
++		adb->cevent_out = ISC_TRUE;
+ 	}
+ }
+ 
+@@ -2431,10 +2433,9 @@ dns_adb_create(isc_mem_t *mem, dns_view_t *view, isc_timermgr_t *timermgr,
+ 	adb->view = view;
+ 	adb->taskmgr = taskmgr;
+ 	adb->next_cleanbucket = 0;
+-	ISC_EVENT_INIT(&adb->cevent, sizeof(adb->cevent), 0, NULL,
+-		       DNS_EVENT_ADBCONTROL, shutdown_task, adb,
+-		       adb, NULL, NULL);
+-	adb->cevent_sent = ISC_FALSE;
++	ISC_EVENT_INIT(&adb->cevent, sizeof(adb->cevent),
++		       0, NULL, 0, NULL, NULL, NULL, NULL, NULL);
++	adb->cevent_out = ISC_FALSE;
+ 	adb->shutting_down = ISC_FALSE;
+ 	ISC_LIST_INIT(adb->whenshutdown);
+ 
+@@ -2468,7 +2469,7 @@ dns_adb_create(isc_mem_t *mem, dns_view_t *view, isc_timermgr_t *timermgr,
+ 				 "intializing table sizes to %u\n",
+ 				 nbuckets[11]);
+ 		adb->nentries = nbuckets[11];
+-		adb->nnames= nbuckets[11];
++		adb->nnames = nbuckets[11];
+ 
+ 	}
+ 
+@@ -2741,9 +2742,28 @@ dns_adb_whenshutdown(dns_adb_t *adb, isc_task_t *task, isc_event_t **eventp) {
+ 	UNLOCK(&adb->lock);
+ }
+ 
++static void
++shutdown_stage2(isc_task_t *task, isc_event_t *event) {
++	dns_adb_t *adb;
++
++	UNUSED(task);
++
++	adb = event->ev_arg;
++	INSIST(DNS_ADB_VALID(adb));
++
++	LOCK(&adb->lock);
++	INSIST(adb->shutting_down);
++	adb->cevent_out = ISC_FALSE;
++	(void)shutdown_names(adb);
++	(void)shutdown_entries(adb);
++	if (dec_adb_irefcnt(adb))
++		check_exit(adb);
++	UNLOCK(&adb->lock);
++}
++
+ void
+ dns_adb_shutdown(dns_adb_t *adb) {
+-	isc_boolean_t need_check_exit;
++	isc_event_t *event;
+ 
+ 	/*
+ 	 * Shutdown 'adb'.
+@@ -2754,11 +2774,16 @@ dns_adb_shutdown(dns_adb_t *adb) {
+ 	if (!adb->shutting_down) {
+ 		adb->shutting_down = ISC_TRUE;
+ 		isc_mem_setwater(adb->mctx, water, adb, 0, 0);
+-		need_check_exit = shutdown_names(adb);
+-		if (!need_check_exit)
+-			need_check_exit = shutdown_entries(adb);
+-		if (need_check_exit)
+-			check_exit(adb);
++		/*
++		 * Isolate shutdown_names and shutdown_entries calls.
++		 */
++		inc_adb_irefcnt(adb);
++		ISC_EVENT_INIT(&adb->cevent, sizeof(adb->cevent), 0, NULL,
++			       DNS_EVENT_ADBCONTROL, shutdown_stage2, adb,
++			       adb, NULL, NULL);
++		adb->cevent_out = ISC_TRUE;
++		event = &adb->cevent;
++		isc_task_send(adb->task, &event);
+ 	}
+ 
+ 	UNLOCK(&adb->lock);
+-- 
+2.9.3
+

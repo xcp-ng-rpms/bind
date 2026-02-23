@@ -1,0 +1,13 @@
+diff --git a/lib/isc/unix/socket.c b/lib/isc/unix/socket.c
+index 05eaeaa..82d0d16 100644
+--- a/lib/isc/unix/socket.c
++++ b/lib/isc/unix/socket.c
+@@ -214,7 +214,7 @@ typedef enum { poll_idle, poll_active, poll_checking } pollstate_t;
+  */
+ #if defined(USE_KQUEUE) || defined(USE_EPOLL) || defined(USE_DEVPOLL)
+ #ifndef ISC_SOCKET_MAXEVENTS
+-#define ISC_SOCKET_MAXEVENTS	64
++#define ISC_SOCKET_MAXEVENTS	2048
+ #endif
+ #endif
+ 

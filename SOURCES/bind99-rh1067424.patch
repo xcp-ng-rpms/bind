@@ -1,0 +1,41 @@
+From 09f1a6e812c02bd8bf1644e2253e21c26d25613a Mon Sep 17 00:00:00 2001
+From: Tomas Hozza <thozza@redhat.com>
+Date: Thu, 20 Feb 2014 11:01:00 +0100
+Subject: [PATCH] check TSIG key ID when receiving NOTIFY
+
+Signed-off-by: Tomas Hozza <thozza@redhat.com>
+---
+ lib/dns/zone.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/lib/dns/zone.c b/lib/dns/zone.c
+index 01ff97b..54b7896 100644
+--- a/lib/dns/zone.c
++++ b/lib/dns/zone.c
+@@ -11846,6 +11846,8 @@ dns_zone_notifyreceive(dns_zone_t *zone, isc_sockaddr_t *from,
+ 	int match = 0;
+ 	isc_netaddr_t netaddr;
+ 	isc_sockaddr_t local, remote;
++	dns_tsigkey_t *tsigkey;
++	dns_name_t *tsig;
+ 
+ 	REQUIRE(DNS_ZONE_VALID(zone));
+ 
+@@ -11928,10 +11930,12 @@ dns_zone_notifyreceive(dns_zone_t *zone, isc_sockaddr_t *from,
+ 
+ 	/*
+ 	 * Accept notify requests from non masters if they are on
+-	 * 'zone->notify_acl'.
++	 * 'zone->notify_acl' or if used key ID match the ACLs.
+ 	 */
++	tsigkey = dns_message_gettsigkey(msg);
++	tsig = dns_tsigkey_identity(tsigkey);
+ 	if (i >= zone->masterscnt && zone->notify_acl != NULL &&
+-	    dns_acl_match(&netaddr, NULL, zone->notify_acl,
++	    dns_acl_match(&netaddr, tsig, zone->notify_acl,
+ 			  &zone->view->aclenv,
+ 			  &match, NULL) == ISC_R_SUCCESS &&
+ 	    match > 0)
+-- 
+1.8.5.3
+

@@ -1,0 +1,67 @@
+diff -up bind-9.9.4/bin/named/interfacemgr.c.rh1215687-limits bind-9.9.4/bin/named/interfacemgr.c
+--- bind-9.9.4/bin/named/interfacemgr.c.rh1215687-limits	2015-05-20 16:08:21.286007013 +0200
++++ bind-9.9.4/bin/named/interfacemgr.c	2015-05-20 16:21:49.227001713 +0200
+@@ -275,7 +275,7 @@ ns_interface_listenudp(ns_interface_t *i
+ 		result = dns_dispatch_getudp_dup(ifp->mgr->dispatchmgr,
+ 						 ns_g_socketmgr,
+ 						 ns_g_taskmgr, &ifp->addr,
+-						 4096, 1000, 32768, 8219, 8237,
++						 4096, 32768, 32768, 8219, 8237,
+ 						 attrs, attrmask,
+ 						 &ifp->udpdispatch[disp],
+ 						 disp == 0
+diff -up bind-9.9.4/bin/named/server.c.rh1215687-limits bind-9.9.4/bin/named/server.c
+--- bind-9.9.4/bin/named/server.c.rh1215687-limits	2015-05-20 16:08:21.272006979 +0200
++++ bind-9.9.4/bin/named/server.c	2015-05-20 16:08:21.288007018 +0200
+@@ -992,7 +992,7 @@ get_view_querysource_dispatch(const cfg_
+ 	}
+ 	if (isc_sockaddr_getport(&sa) == 0) {
+ 		attrs |= DNS_DISPATCHATTR_EXCLUSIVE;
+-		maxdispatchbuffers = 4096;
++		maxdispatchbuffers = 32768;
+ 	} else {
+ 		INSIST(obj != NULL);
+ 		if (is_firstview) {
+@@ -1001,7 +1001,7 @@ get_view_querysource_dispatch(const cfg_
+ 				    "suppresses port randomization and can be "
+ 				    "insecure.");
+ 		}
+-		maxdispatchbuffers = 1000;
++		maxdispatchbuffers = 32768;
+ 	}
+ 
+ 	attrmask = 0;
+@@ -6491,7 +6491,7 @@ ns_add_reserved_dispatch(ns_server_t *se
+ 
+ 	result = dns_dispatch_getudp(ns_g_dispatchmgr, ns_g_socketmgr,
+ 				     ns_g_taskmgr, &dispatch->addr, 4096,
+-				     1000, 32768, 16411, 16433,
++				     32768, 32768, 16411, 16433,
+ 				     attrs, attrmask, &dispatch->dispatch);
+ 	if (result != ISC_R_SUCCESS)
+ 		goto cleanup;
+diff -up bind-9.9.4/lib/dns/dispatch.c.rh1215687-limits bind-9.9.4/lib/dns/dispatch.c
+diff -up bind-9.9.4/lib/dns/request.c.rh1215687-limits bind-9.9.4/lib/dns/request.c
+--- bind-9.9.4/lib/dns/request.c.rh1215687-limits	2013-09-05 07:09:08.000000000 +0200
++++ bind-9.9.4/lib/dns/request.c	2015-05-20 16:08:21.286007013 +0200
+@@ -601,7 +601,7 @@ find_udp_dispatch(dns_requestmgr_t *requ
+ 				    requestmgr->socketmgr,
+ 				    requestmgr->taskmgr,
+ 				    srcaddr, 4096,
+-				    1000, 32768, 16411, 16433,
++				    32768, 32768, 16411, 16433,
+ 				    attrs, attrmask,
+ 				    dispatchp));
+ }
+diff -up bind-9.9.4/lib/dns/resolver.c.rh1215687-limits bind-9.9.4/lib/dns/resolver.c
+--- bind-9.9.4/lib/dns/resolver.c.rh1215687-limits	2015-05-20 16:08:21.277006991 +0200
++++ bind-9.9.4/lib/dns/resolver.c	2015-05-20 16:08:21.285007010 +0200
+@@ -1489,7 +1489,7 @@ fctx_query(fetchctx_t *fctx, dns_adbaddr
+ 			result = dns_dispatch_getudp(res->dispatchmgr,
+ 						     res->socketmgr,
+ 						     res->taskmgr, &addr,
+-						     4096, 1000, 32768, 16411,
++						     4096, 20000, 32768, 16411,
+ 						     16433, attrs, attrmask,
+ 						     &query->dispatch);
+ 			if (result != ISC_R_SUCCESS)

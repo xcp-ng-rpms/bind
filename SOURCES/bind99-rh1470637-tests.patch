@@ -1,0 +1,434 @@
+From 148bbbd1c1463c9b9626d7d9668d8768179d596b Mon Sep 17 00:00:00 2001
+From: Mark Andrews <marka@isc.org>
+Date: Fri, 11 Dec 2015 14:52:12 +1100
+Subject: [PATCH 1/2] add digdelv
+
+(cherry picked from commit 51aed1827453f40ee56b165d45c5d58d96838d94)
+
+Deleted failing tests
+---
+ bin/tests/system/conf.sh.in             |   2 +-
+ bin/tests/system/digdelv/clean.sh       |  21 +++++
+ bin/tests/system/digdelv/ns1/named.conf |  37 +++++++++
+ bin/tests/system/digdelv/ns1/root.db    |  29 +++++++
+ bin/tests/system/digdelv/ns2/example.db |  50 ++++++++++++
+ bin/tests/system/digdelv/ns2/named.conf |  40 ++++++++++
+ bin/tests/system/digdelv/ns3/named.conf |  36 +++++++++
+ bin/tests/system/digdelv/tests.sh       | 137 ++++++++++++++++++++++++++++++++
+ 8 files changed, 351 insertions(+), 1 deletion(-)
+ create mode 100644 bin/tests/system/digdelv/clean.sh
+ create mode 100644 bin/tests/system/digdelv/ns1/named.conf
+ create mode 100644 bin/tests/system/digdelv/ns1/root.db
+ create mode 100644 bin/tests/system/digdelv/ns2/example.db
+ create mode 100644 bin/tests/system/digdelv/ns2/named.conf
+ create mode 100644 bin/tests/system/digdelv/ns3/named.conf
+ create mode 100644 bin/tests/system/digdelv/tests.sh
+
+diff --git a/bin/tests/system/conf.sh.in b/bin/tests/system/conf.sh.in
+index 6df4734..49c5686 100644
+--- a/bin/tests/system/conf.sh.in
++++ b/bin/tests/system/conf.sh.in
+@@ -60,7 +60,7 @@ SAMPLE=$TOP/lib/export/samples/sample
+ # v6synth
+ SUBDIRS="acl additional allow_query addzone autosign builtin
+ 	 cacheclean checkconf @CHECKDS@ checknames checkzone @COVERAGE@
+-         database dlv dlvauto dlz dlzexternal dname dns64 dnssec dyndb
++         database digdelv dlv dlvauto dlz dlzexternal dname dns64 dnssec dyndb
+          ecdsa formerr forward glue gost ixfr inline limits logfileconfig
+          lwresd masterfile masterformat metadata notify nsupdate pending
+ 	 @PKCS11_TEST@ redirect resolver rndc rpz rrl rrsetorder rsabigexponent
+diff --git a/bin/tests/system/digdelv/clean.sh b/bin/tests/system/digdelv/clean.sh
+new file mode 100644
+index 0000000..0f442fb
+--- /dev/null
++++ b/bin/tests/system/digdelv/clean.sh
+@@ -0,0 +1,21 @@
++#!/bin/sh
++#
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++rm -f dig.out.test*
++rm -f delv.out.test*
++rm -f */named.memstats
++rm -f */named.run
++rm -f ns*/named.lock
+diff --git a/bin/tests/system/digdelv/ns1/named.conf b/bin/tests/system/digdelv/ns1/named.conf
+new file mode 100644
+index 0000000..c5f0470
+--- /dev/null
++++ b/bin/tests/system/digdelv/ns1/named.conf
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS1
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.1;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.1; };
++	listen-on-v6 { fd92:7065:b8e:ffff::1; };
++	recursion no;
++	notify yes;
++	dnssec-enable no;
++	dnssec-validation no;
++};
++
++zone "." {
++	type master;
++	file "root.db";
++};
++
+diff --git a/bin/tests/system/digdelv/ns1/root.db b/bin/tests/system/digdelv/ns1/root.db
+new file mode 100644
+index 0000000..f4316a5
+--- /dev/null
++++ b/bin/tests/system/digdelv/ns1/root.db
+@@ -0,0 +1,29 @@
++; Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++;
++; Permission to use, copy, modify, and/or distribute this software for any
++; purpose with or without fee is hereby granted, provided that the above
++; copyright notice and this permission notice appear in all copies.
++;
++; THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++; REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++; AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++; INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++; LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++; OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++; PERFORMANCE OF THIS SOFTWARE.
++
++$TTL 300
++. 			IN SOA	gson.nominum.com. a.root.servers.nil. (
++				2000042100   	; serial
++				600         	; refresh
++				600         	; retry
++				1200    	; expire
++				600       	; minimum
++				)
++.			NS	a.root-servers.nil.
++a.root-servers.nil.	A	10.53.0.1
++a.root-servers.nil.	AAAA	fd92:7065:b8e:ffff::1
++
++example.		NS	ns2.example.
++ns2.example.		A	10.53.0.2
++ns2.example.		AAAA	fd92:7065:b8e:ffff::2
+diff --git a/bin/tests/system/digdelv/ns2/example.db b/bin/tests/system/digdelv/ns2/example.db
+new file mode 100644
+index 0000000..0a1aa5d
+--- /dev/null
++++ b/bin/tests/system/digdelv/ns2/example.db
+@@ -0,0 +1,50 @@
++; Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++;
++; Permission to use, copy, modify, and/or distribute this software for any
++; purpose with or without fee is hereby granted, provided that the above
++; copyright notice and this permission notice appear in all copies.
++;
++; THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++; REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++; AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++; INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++; LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++; OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++; PERFORMANCE OF THIS SOFTWARE.
++
++$TTL 300	; 5 minutes
++@			IN SOA	mname1. . (
++				2000042407 ; serial
++				20         ; refresh (20 seconds)
++				20         ; retry (20 seconds)
++				1814400    ; expire (3 weeks)
++				3600       ; minimum (1 hour)
++				)
++			NS	ns2
++			NS	ns3
++ns2			A	10.53.0.2
++ns2			AAAA	fd92:7065:b8e:ffff::2
++ns3			A	10.53.0.3
++ns3			AAAA	fd92:7065:b8e:ffff::3
++
++a			A	10.0.0.1
++a			AAAA	fd92:7065:b8e:ffff::1
++b			A	10.0.0.2
++b			AAAA	fd92:7065:b8e:ffff::2
++c			A	10.0.0.3
++c			AAAA	fd92:7065:b8e:ffff::3
++
++foo			TXT	"testing"
++foo			A	10.0.1.0
++foo			SSHFP	2 1 123456789abcdef67890123456789abcdef67890
++
++;;
++;; we are not testing DNSSEC behavior, so we don't care about the semantics
++;; of the following records.
++dnskey                  300     DNSKEY  256 3 1 (
++                                        AQPTpWyReB/e9Ii6mVGnakS8hX2zkh/iUYAg
++                                        +Ge4noWROpTWOIBvm76zeJPWs4Zfqa1IsswD
++                                        Ix5Mqeg0zwclz59uecKsKyx5w9IhtZ8plc4R
++                                        b9VIE5x7KNHAYTvTO5d4S8M=
++                                        )
++
+diff --git a/bin/tests/system/digdelv/ns2/named.conf b/bin/tests/system/digdelv/ns2/named.conf
+new file mode 100644
+index 0000000..266e958
+--- /dev/null
++++ b/bin/tests/system/digdelv/ns2/named.conf
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS2
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.2;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.2; };
++	listen-on-v6 { fd92:7065:b8e:ffff::2; };
++	recursion no;
++	dnssec-enable no;
++	dnssec-validation no;
++};
++
++zone "." {
++	type hint;
++	file "../../common/root.hint";
++};
++
++zone "example" {
++	type master;
++	file "example.db";
++};
+diff --git a/bin/tests/system/digdelv/ns3/named.conf b/bin/tests/system/digdelv/ns3/named.conf
+new file mode 100644
+index 0000000..e73c543
+--- /dev/null
++++ b/bin/tests/system/digdelv/ns3/named.conf
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
++ */
++
++// NS4
++
++controls { /* empty */ };
++
++options {
++	query-source address 10.53.0.3;
++	port 5300;
++	pid-file "named.pid";
++	listen-on { 10.53.0.3; };
++	listen-on-v6 { fd92:7065:b8e:ffff::3; };
++	recursion yes;
++	acache-enable yes;
++	dnssec-enable no;
++	dnssec-validation no;
++};
++
++zone "." {
++	type hint;
++	file "../../common/root.hint";
++};
+diff --git a/bin/tests/system/digdelv/tests.sh b/bin/tests/system/digdelv/tests.sh
+new file mode 100644
+index 0000000..988bd52
+--- /dev/null
++++ b/bin/tests/system/digdelv/tests.sh
+@@ -0,0 +1,137 @@
++# Copyright (C) 2015  Internet Systems Consortium, Inc. ("ISC")
++#
++# Permission to use, copy, modify, and/or distribute this software for any
++# purpose with or without fee is hereby granted, provided that the above
++# copyright notice and this permission notice appear in all copies.
++#
++# THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
++# REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++# AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
++# INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++# LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++# PERFORMANCE OF THIS SOFTWARE.
++
++SYSTEMTESTTOP=..
++. $SYSTEMTESTTOP/conf.sh
++
++status=0
++n=0
++# using dig insecure mode as not testing dnssec here
++DIGOPTS="-i -p 5300"
++
++if [ -x ${DIG} ] ; then
++  n=`expr $n + 1`
++  echo "I:checking dig short form works ($n)"
++  ret=0
++  $DIG $DIGOPTS @10.53.0.3 +short a a.example > dig.out.test$n || ret=1
++  if test `wc -l < dig.out.test$n` != 1 ; then ret=1 ; fi
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking dig split width works ($n)"
++  ret=0
++  $DIG $DIGOPTS @10.53.0.3 +split=4 -t sshfp foo.example > dig.out.test$n || ret=1
++  grep " 9ABC DEF6 7890 " < dig.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking dig with reverse lookup works ($n)"
++  ret=0
++  $DIG $DIGOPTS @10.53.0.3 -x 127.0.0.1 > dig.out.test$n 2>&1 || ret=1
++  # doesn't matter if has answer
++  grep -i "127\.in-addr\.arpa\." < dig.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking dig over TCP works ($n)"
++  ret=0
++  $DIG $DIGOPTS +tcp @10.53.0.3 a a.example > dig.out.test$n || ret=1
++  grep "10\.0\.0\.1$" < dig.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking dig +rrcomments works for DNSKEY($n)"
++  ret=0
++  $DIG $DIGOPTS +tcp @10.53.0.3 +rrcomments DNSKEY dnskey.example > dig.out.test$n || ret=1
++  grep "; ZSK; alg = RSAMD5 *; key id = 30795" < dig.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi
++  status=`expr $status + $ret`
++
++else
++  echo "W:$DIG is needed, so skipping these dig tests"
++fi
++
++# using delv insecure mode as not testing dnssec here
++DELVOPTS="-i -p 5300"
++
++if [ -n "${DELV}" -a -x "${DELV}" ] ; then
++  n=`expr $n + 1`
++  echo "I:checking delv short form works ($n)"
++  ret=0
++  $DELV $DELVOPTS @10.53.0.3 +short a a.example > delv.out.test$n || ret=1
++  if test `wc -l < delv.out.test$n` != 1 ; then ret=1 ; fi
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking delv split width works ($n)"
++  ret=0
++  $DELV $DELVOPTS @10.53.0.3 +split=4 -t sshfp foo.example > delv.out.test$n || ret=1
++  grep " 9ABC DEF6 7890 " < delv.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking delv with IPv6 on IPv4 does not work ($n)"
++  if $TESTSOCK6 fd92:7065:b8e:ffff::3
++  then
++    ret=0
++    # following should fail because @IPv4 overrides earlier @IPv6 above
++    # and -6 forces IPv6 so this should fail, such as:
++    # ;; getaddrinfo failed: hostname nor servname provided, or not known
++    # ;; resolution failed: not found
++    # note that delv returns success even on lookup failure
++    $DELV $DELVOPTS @fd92:7065:b8e:ffff::3 @10.53.0.3 -6 -t txt foo.example > delv.out.test$n 2>&1 || ret=1
++    # it should have no results but error output
++    grep "testing" < delv.out.test$n > /dev/null && ret=1
++    grep "getaddrinfo failed:" < delv.out.test$n > /dev/null || ret=1
++    if [ $ret != 0 ]; then echo "I:failed"; fi 
++    status=`expr $status + $ret`
++  else
++    echo "I:IPv6 unavailable; skipping"
++  fi
++
++  n=`expr $n + 1`
++  echo "I:checking delv with reverse lookup works ($n)"
++  ret=0
++  $DELV $DELVOPTS @10.53.0.3 -x 127.0.0.1 > delv.out.test$n 2>&1 || ret=1
++  # doesn't matter if has answer
++  grep -i "127\.in-addr\.arpa\." < delv.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi 
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking delv over TCP works ($n)"
++  ret=0
++  $DELV $DELVOPTS @10.53.0.3 a a.example > delv.out.test$n || ret=1
++  grep "10\.0\.0\.1$" < delv.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi
++  status=`expr $status + $ret`
++
++  n=`expr $n + 1`
++  echo "I:checking delv +rrcomments works for DNSKEY($n)"
++  ret=0
++  $DELV $DELVOPTS @10.53.0.3 +rrcomments DNSKEY dnskey.example > delv.out.test$n || ret=1
++  grep "; ZSK; alg = RSAMD5 *; key id = 30795" < delv.out.test$n > /dev/null || ret=1
++  if [ $ret != 0 ]; then echo "I:failed"; fi
++  status=`expr $status + $ret`
++
++  exit $status
++else
++  echo "W:${DELV:-delv} is not available, so skipping these delv tests"
++fi
+-- 
+2.9.5
+

@@ -1,0 +1,159 @@
+commit 524f5c0d8fa5bd55c98243be889528f48437a2f7
+Author: Mark Andrews <marka@isc.org>
+Date:   Fri Dec 9 12:50:18 2016 +1100
+
+    4530.   [bug]           Change 4489 broke the handling of CNAME -> DNAME
+                            in responses resulting in SERVFAIL being returned.
+                            [RT #43779]
+    
+    (cherry picked from commit 60cb462c56536f307fac4db8bdebf1247e2b5f66)
+
+diff --git a/bin/tests/system/dname/ns2/example.db b/bin/tests/system/dname/ns2/example.db
+index ece3506..4289134 100644
+--- a/bin/tests/system/dname/ns2/example.db
++++ b/bin/tests/system/dname/ns2/example.db
+@@ -29,4 +29,6 @@ a.short			A	10.0.0.1
+ short-dname		DNAME	short
+ a.longlonglonglonglonglonglonglonglonglonglonglonglong	A 10.0.0.2
+ long-dname		DNAME	longlonglonglonglonglonglonglonglonglonglonglonglong
+-;
++cname			CNAME	a.cnamedname
++cnamedname		DNAME	target
++a.target		A	10.0.0.3
+diff --git a/bin/tests/system/dname/tests.sh b/bin/tests/system/dname/tests.sh
+index d22f54b..04bfcb2 100644
+--- a/bin/tests/system/dname/tests.sh
++++ b/bin/tests/system/dname/tests.sh
+@@ -63,6 +63,24 @@ grep "status: YXDOMAIN" dig.out.ns4.toolong > /dev/null || ret=1
+ if [ $ret != 0 ]; then echo "I:failed"; fi
+ status=`expr $status + $ret`
+ 
++echo "I:checking cname to dname from authoritative"
++ret=0
++$DIG cname.example @10.53.0.2 a -p 5300 > dig.out.ns2.cname
++grep "status: NOERROR" dig.out.ns2.cname > /dev/null || ret=1
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
++echo "I:checking cname to dname from recursive"
++ret=0
++$DIG cname.example @10.53.0.4 a -p 5300 > dig.out.ns4.cname
++grep "status: NOERROR" dig.out.ns4.cname > /dev/null || ret=1
++grep '^cname.example.' dig.out.ns4.cname > /dev/null || ret=1
++grep '^cnamedname.example.' dig.out.ns4.cname > /dev/null || ret=1
++grep '^a.cnamedname.example.' dig.out.ns4.cname > /dev/null || ret=1
++grep '^a.target.example.' dig.out.ns4.cname > /dev/null || ret=1
++if [ $ret != 0 ]; then echo "I:failed"; fi
++status=`expr $status + $ret`
++
+ echo "I:exit status: $status"
+ 
+ exit $status
+diff --git a/lib/dns/resolver.c b/lib/dns/resolver.c
+index 4bef072..de80928 100644
+--- a/lib/dns/resolver.c
++++ b/lib/dns/resolver.c
+@@ -6463,7 +6463,7 @@ static isc_result_t
+ answer_response(fetchctx_t *fctx) {
+ 	isc_result_t result;
+ 	dns_message_t *message;
+-	dns_name_t *name, *dname = NULL, *qname, *dqname, tname, *ns_name;
++	dns_name_t *name, *dname = NULL, *qname, tname, *ns_name;
+ 	dns_name_t *cname = NULL;
+ 	dns_rdataset_t *rdataset, *ns_rdataset;
+ 	isc_boolean_t done, external, chaining, aa, found, want_chaining;
+@@ -6471,7 +6471,7 @@ answer_response(fetchctx_t *fctx) {
+ 	isc_boolean_t wanted_chaining;
+ 	unsigned int aflag;
+ 	dns_rdatatype_t type;
+-	dns_fixedname_t fdname, fqname, fqdname;
++	dns_fixedname_t fdname, fqname;
+ 	dns_view_t *view;
+ 
+ 	FCTXTRACE("answer_response");
+@@ -6495,13 +6495,12 @@ answer_response(fetchctx_t *fctx) {
+ 		aa = ISC_TRUE;
+ 	else
+ 		aa = ISC_FALSE;
+-	dqname = qname = &fctx->name;
++	qname = &fctx->name;
+ 	type = fctx->type;
+ 	view = fctx->res->view;
+-	dns_fixedname_init(&fqdname);
+ 	result = dns_message_firstname(message, DNS_SECTION_ANSWER);
+ 	while (!done && result == ISC_R_SUCCESS) {
+-		dns_namereln_t namereln, dnamereln;
++		dns_namereln_t namereln;
+ 		int order;
+ 		unsigned int nlabels;
+ 
+@@ -6509,8 +6508,6 @@ answer_response(fetchctx_t *fctx) {
+ 		dns_message_currentname(message, DNS_SECTION_ANSWER, &name);
+ 		external = ISC_TF(!dns_name_issubdomain(name, &fctx->domain));
+ 		namereln = dns_name_fullcompare(qname, name, &order, &nlabels);
+-		dnamereln = dns_name_fullcompare(dqname, name, &order,
+-						 &nlabels);
+ 		if (namereln == dns_namereln_equal) {
+ 			wanted_chaining = ISC_FALSE;
+ 			for (rdataset = ISC_LIST_HEAD(name->list);
+@@ -6763,11 +6760,24 @@ answer_response(fetchctx_t *fctx) {
+ 					return (DNS_R_FORMERR);
+ 				}
+ 
+-				if (dnamereln != dns_namereln_subdomain) {
++				/*
++				 * If DNAME + synthetic CNAME then the
++				 * namereln is dns_namereln_subdomain.
++				 *
++				 * If synthetic CNAME + DNAME then the
++				 * namereln is dns_namereln_commonancestor
++				 * and the number of label must match the
++				 * DNAME.  This order is not RFC compliant.
++				 */
++
++				if (namereln != dns_namereln_subdomain &&
++				    (namereln != dns_namereln_commonancestor ||
++				     nlabels != dns_name_countlabels(name)))
++				{
+ 					char qbuf[DNS_NAME_FORMATSIZE];
+ 					char obuf[DNS_NAME_FORMATSIZE];
+ 
+-					dns_name_format(dqname, qbuf,
++					dns_name_format(qname, qbuf,
+ 							sizeof(qbuf));
+ 					dns_name_format(name, obuf,
+ 							sizeof(obuf));
+@@ -6782,7 +6792,7 @@ answer_response(fetchctx_t *fctx) {
+ 					want_chaining = ISC_TRUE;
+ 					POST(want_chaining);
+ 					aflag = DNS_RDATASETATTR_ANSWER;
+-					result = dname_target(rdataset, dqname,
++					result = dname_target(rdataset, qname,
+ 							      nlabels, &fdname);
+ 					if (result == ISC_R_NOSPACE) {
+ 						/*
+@@ -6799,13 +6809,11 @@ answer_response(fetchctx_t *fctx) {
+ 
+ 					dname = dns_fixedname_name(&fdname);
+ 					if (!is_answertarget_allowed(view,
+-						     dqname, rdataset->type,
++						     qname, rdataset->type,
+ 						     dname, &fctx->domain))
+ 					{
+ 						return (DNS_R_SERVFAIL);
+ 					}
+-					dqname = dns_fixedname_name(&fqdname);
+-					dns_name_copy(dname, dqname, NULL);
+ 				} else {
+ 					/*
+ 					 * We've found a signature that
+@@ -6951,7 +6959,8 @@ answer_response(fetchctx_t *fctx) {
+ 						rdataset->trust =
+ 						    dns_trust_additional;
+ 
+-					if (rdataset->type == dns_rdatatype_ns) {
++					if (rdataset->type == dns_rdatatype_ns)
++					{
+ 						ns_name = name;
+ 						ns_rdataset = rdataset;
+ 					}

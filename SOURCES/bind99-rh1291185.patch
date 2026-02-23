@@ -1,0 +1,58 @@
+diff --git a/lib/dns/resolver.c b/lib/dns/resolver.c
+index 8696b15..5ef2dd6 100644
+--- a/lib/dns/resolver.c
++++ b/lib/dns/resolver.c
+@@ -7373,9 +7373,12 @@ resquery_response(isc_task_t *task, isc_event_t *event) {
+ 		 * NXDOMAIN, NXRDATASET, or referral.
+ 		 */
+ 		result = noanswer_response(fctx, NULL, 0);
+-		if (result == DNS_R_CHASEDSSERVERS) {
+-		} else if (result == DNS_R_DELEGATION) {
+-		force_referral:
++		switch (result) {
++		case ISC_R_SUCCESS:
++		case DNS_R_CHASEDSSERVERS:
++			break;
++		case DNS_R_DELEGATION:
++ force_referral:
+ 			/*
+ 			 * We don't have the answer, but we know a better
+ 			 * place to look.
+@@ -7400,7 +7403,8 @@ resquery_response(isc_task_t *task, isc_event_t *event) {
+ 			fctx->adberr = 0;
+ 
+ 			result = ISC_R_SUCCESS;
+-		} else if (result != ISC_R_SUCCESS) {
++			break;
++		default:
+ 			/*
+ 			 * Something has gone wrong.
+ 			 */
+diff --git a/lib/dns/view.c b/lib/dns/view.c
+index 142b09e..35900b3 100644
+--- a/lib/dns/view.c
++++ b/lib/dns/view.c
+@@ -1216,6 +1216,7 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
+ 	dns_name_t *zfname;
+ 	dns_rdataset_t zrdataset, zsigrdataset;
+ 	dns_fixedname_t zfixedname;
++	unsigned int ztoptions = 0;
+ 
+ #ifndef BIND9
+ 	UNUSED(zone);
+@@ -1242,9 +1243,12 @@ dns_view_findzonecut2(dns_view_t *view, dns_name_t *name, dns_name_t *fname,
+ #ifdef BIND9
+ 	zone = NULL;
+ 	LOCK(&view->lock);
+-	if (view->zonetable != NULL)
+-		result = dns_zt_find(view->zonetable, name, 0, NULL, &zone);
+-	else
++	if (view->zonetable != NULL) {
++		if ((options & DNS_DBFIND_NOEXACT) != 0)
++			ztoptions |= DNS_ZTFIND_NOEXACT;
++		result = dns_zt_find(view->zonetable, name, ztoptions,
++				     NULL, &zone);
++	} else
+ 		result = ISC_R_NOTFOUND;
+ 	if (result == ISC_R_SUCCESS || result == DNS_R_PARTIALMATCH)
+ 		result = dns_zone_getdb(zone, &db);

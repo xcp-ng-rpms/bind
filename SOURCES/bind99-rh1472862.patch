@@ -1,0 +1,32 @@
+From e3894cd3a92be79a64072835008ec589b17c601a Mon Sep 17 00:00:00 2001
+From: Evan Hunt <each@isc.org>
+Date: Wed, 9 Apr 2014 17:17:53 -0700
+Subject: [PATCH] [v9_9] missing manpage install rule for dnssec-importkey
+
+(cherry picked from commit 540daf2887dfc813657c27408a2363ba719bf8d4)
+---
+ bin/dnssec/Makefile.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/bin/dnssec/Makefile.in b/bin/dnssec/Makefile.in
+index 5966d16..58352d8 100644
+--- a/bin/dnssec/Makefile.in
++++ b/bin/dnssec/Makefile.in
+@@ -55,12 +55,12 @@ SRCS =		dnssec-dsfromkey.c dnssec-keyfromlabel.c dnssec-keygen.c \
+ 
+ MANPAGES =	dnssec-dsfromkey.8 dnssec-keyfromlabel.8 dnssec-keygen.8 \
+ 		dnssec-revoke.8 dnssec-settime.8 dnssec-signzone.8 \
+-		dnssec-verify.8
++		dnssec-verify.8 dnssec-importkey.8
+ 
+ HTMLPAGES =	dnssec-dsfromkey.html dnssec-keyfromlabel.html \
+ 		dnssec-keygen.html dnssec-revoke.html \
+ 		dnssec-settime.html dnssec-signzone.html \
+-		dnssec-verify.html
++		dnssec-verify.html dnssec-importkey.html
+ 
+ MANOBJS =	${MANPAGES} ${HTMLPAGES}
+ 
+-- 
+2.9.4
+

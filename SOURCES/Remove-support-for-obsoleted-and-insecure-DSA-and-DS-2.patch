@@ -1,0 +1,297 @@
+Applied fix from upstream
+
+From 3994b1f9c2bd4438586523fb2e49b0fb847b487b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@sury.org>
+Date: Wed, 6 Jun 2018 14:51:08 +0200
+Subject: [PATCH] Remove support for obsoleted and insecure DSA and
+ DSA-NSEC3-SHA1 algorithms
+
+---
+ lib/dns/dst_api.c      | 10 ----------
+ lib/dns/dst_internal.h |  4 ----
+ lib/dns/dst_parse.c    | 35 ---------------------------------
+ lib/dns/rcode.c        |  2 --
+ lib/isc/pk11.c         | 44 +++++-------------------------------------
+ 5 files changed, 5 insertions(+), 90 deletions(-)
+
+diff --git a/lib/dns/dst_api.c b/lib/dns/dst_api.c
+index e71f202..e38dfb1 100644
+--- a/lib/dns/dst_api.c
++++ b/lib/dns/dst_api.c
+@@ -221,8 +221,6 @@ dst_lib_init2(isc_mem_t *mctx, isc_entropy_t *ectx,
+ 	RETERR(dst__opensslrsa_init(&dst_t_func[DST_ALG_RSASHA512],
+ 				    DST_ALG_RSASHA512));
+ #ifdef HAVE_OPENSSL_DSA
+-	RETERR(dst__openssldsa_init(&dst_t_func[DST_ALG_DSA]));
+-	RETERR(dst__openssldsa_init(&dst_t_func[DST_ALG_NSEC3DSA]));
+ #endif
+ 	RETERR(dst__openssldh_init(&dst_t_func[DST_ALG_DH]));
+ #ifdef HAVE_OPENSSL_GOST
+@@ -239,8 +237,6 @@ dst_lib_init2(isc_mem_t *mctx, isc_entropy_t *ectx,
+ 	RETERR(dst__pkcs11rsa_init(&dst_t_func[DST_ALG_NSEC3RSASHA1]));
+ 	RETERR(dst__pkcs11rsa_init(&dst_t_func[DST_ALG_RSASHA256]));
+ 	RETERR(dst__pkcs11rsa_init(&dst_t_func[DST_ALG_RSASHA512]));
+-	RETERR(dst__pkcs11dsa_init(&dst_t_func[DST_ALG_DSA]));
+-	RETERR(dst__pkcs11dsa_init(&dst_t_func[DST_ALG_NSEC3DSA]));
+ 	RETERR(dst__pkcs11dh_init(&dst_t_func[DST_ALG_DH]));
+ #ifdef HAVE_PKCS11_ECDSA
+ 	RETERR(dst__pkcs11ecdsa_init(&dst_t_func[DST_ALG_ECDSA256]));
+@@ -1225,10 +1221,6 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
+ 	case DST_ALG_RSASHA512:
+ 		*n = (key->key_size + 7) / 8;
+ 		break;
+-	case DST_ALG_DSA:
+-	case DST_ALG_NSEC3DSA:
+-		*n = DNS_SIG_DSASIGSIZE;
+-		break;
+ 	case DST_ALG_ECCGOST:
+ 		*n = DNS_SIG_GOSTSIGSIZE;
+ 		break;
+@@ -1560,8 +1552,6 @@ issymmetric(const dst_key_t *key) {
+ 	case DST_ALG_NSEC3RSASHA1:
+ 	case DST_ALG_RSASHA256:
+ 	case DST_ALG_RSASHA512:
+-	case DST_ALG_DSA:
+-	case DST_ALG_NSEC3DSA:
+ 	case DST_ALG_DH:
+ 	case DST_ALG_ECCGOST:
+ 	case DST_ALG_ECDSA256:
+diff --git a/lib/dns/dst_internal.h b/lib/dns/dst_internal.h
+index b15135e..86b40d3 100644
+--- a/lib/dns/dst_internal.h
++++ b/lib/dns/dst_internal.h
+@@ -54,7 +54,6 @@
+ 
+ #ifdef OPENSSL
+ #include <openssl/dh.h>
+-#include <openssl/dsa.h>
+ #include <openssl/err.h>
+ #include <openssl/evp.h>
+ #include <openssl/objects.h>
+@@ -115,7 +114,6 @@ struct dst_key {
+ #if !defined(USE_EVP) || !USE_EVP
+ 		RSA *rsa;
+ #endif
+-		DSA *dsa;
+ 		DH *dh;
+ 		EVP_PKEY *pkey;
+ #elif PKCS11CRYPTO
+@@ -233,8 +231,6 @@ isc_result_t dst__hmacsha512_init(struct dst_func **funcp);
+ isc_result_t dst__opensslrsa_init(struct dst_func **funcp,
+ 				  unsigned char algorithm);
+ isc_result_t dst__pkcs11rsa_init(struct dst_func **funcp);
+-isc_result_t dst__openssldsa_init(struct dst_func **funcp);
+-isc_result_t dst__pkcs11dsa_init(struct dst_func **funcp);
+ isc_result_t dst__openssldh_init(struct dst_func **funcp);
+ isc_result_t dst__pkcs11dh_init(struct dst_func **funcp);
+ isc_result_t dst__gssapi_init(struct dst_func **funcp);
+diff --git a/lib/dns/dst_parse.c b/lib/dns/dst_parse.c
+index ec622d9..3dcc751 100644
+--- a/lib/dns/dst_parse.c
++++ b/lib/dns/dst_parse.c
+@@ -99,12 +99,6 @@ static struct parse_map map[] = {
+ 	{TAG_DH_PRIVATE, "Private_value(x):"},
+ 	{TAG_DH_PUBLIC, "Public_value(y):"},
+ 
+-	{TAG_DSA_PRIME, "Prime(p):"},
+-	{TAG_DSA_SUBPRIME, "Subprime(q):"},
+-	{TAG_DSA_BASE, "Base(g):"},
+-	{TAG_DSA_PRIVATE, "Private_value(x):"},
+-	{TAG_DSA_PUBLIC, "Public_value(y):"},
+-
+ 	{TAG_GOST_PRIVASN1, "GostAsn1:"},
+ 	{TAG_GOST_PRIVRAW, "PrivateKey:"},
+ 
+@@ -236,26 +230,6 @@ check_dh(const dst_private_t *priv) {
+ 	return (0);
+ }
+ 
+-static int
+-check_dsa(const dst_private_t *priv, isc_boolean_t external) {
+-	int i, j;
+-
+-	if (external)
+-		return ((priv->nelements == 0)? 0 : -1);
+-
+-	if (priv->nelements != DSA_NTAGS)
+-		return (-1);
+-
+-	for (i = 0; i < DSA_NTAGS; i++) {
+-		for (j = 0; j < priv->nelements; j++)
+-			if (priv->elements[j].tag == TAG(DST_ALG_DSA, i))
+-				break;
+-		if (j == priv->nelements)
+-			return (-1);
+-	}
+-	return (0);
+-}
+-
+ static int
+ check_gost(const dst_private_t *priv, isc_boolean_t external) {
+ 
+@@ -360,9 +334,6 @@ check_data(const dst_private_t *priv, const unsigned int alg,
+ 		return (check_rsa(priv, external));
+ 	case DST_ALG_DH:
+ 		return (check_dh(priv));
+-	case DST_ALG_DSA:
+-	case DST_ALG_NSEC3DSA:
+-		return (check_dsa(priv, external));
+ 	case DST_ALG_ECCGOST:
+ 		return (check_gost(priv, external));
+ 	case DST_ALG_ECDSA256:
+@@ -677,18 +648,12 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
+ 	case DST_ALG_DH:
+ 		fprintf(fp, "(DH)\n");
+ 		break;
+-	case DST_ALG_DSA:
+-		fprintf(fp, "(DSA)\n");
+-		break;
+ 	case DST_ALG_RSASHA1:
+ 		fprintf(fp, "(RSASHA1)\n");
+ 		break;
+ 	case DST_ALG_NSEC3RSASHA1:
+ 		fprintf(fp, "(NSEC3RSASHA1)\n");
+ 		break;
+-	case DST_ALG_NSEC3DSA:
+-		fprintf(fp, "(NSEC3DSA)\n");
+-		break;
+ 	case DST_ALG_RSASHA256:
+ 		fprintf(fp, "(RSASHA256)\n");
+ 		break;
+diff --git a/lib/dns/rcode.c b/lib/dns/rcode.c
+index 091b3c7..3a57ef5 100644
+--- a/lib/dns/rcode.c
++++ b/lib/dns/rcode.c
+@@ -100,8 +100,6 @@
+ 	{ DNS_KEYALG_RSAMD5, "RSAMD5", 0 }, \
+ 	{ DNS_KEYALG_RSAMD5, "RSA", 0 }, \
+ 	{ DNS_KEYALG_DH, "DH", 0 }, \
+-	{ DNS_KEYALG_DSA, "DSA", 0 }, \
+-	{ DNS_KEYALG_NSEC3DSA, "NSEC3DSA", 0 }, \
+ 	{ DNS_KEYALG_ECC, "ECC", 0 }, \
+ 	{ DNS_KEYALG_RSASHA1, "RSASHA1", 0 }, \
+ 	{ DNS_KEYALG_NSEC3RSASHA1, "NSEC3RSASHA1", 0 }, \
+diff --git a/lib/isc/pk11.c b/lib/isc/pk11.c
+index de4479b..4789422 100644
+--- a/lib/isc/pk11.c
++++ b/lib/isc/pk11.c
+@@ -172,7 +172,6 @@ static ISC_LIST(pk11_token_t) tokens;
+ 
+ static pk11_token_t *rand_token;
+ static pk11_token_t *best_rsa_token;
+-static pk11_token_t *best_dsa_token;
+ static pk11_token_t *best_dh_token;
+ static pk11_token_t *digest_token;
+ static pk11_token_t *best_ec_token;
+@@ -348,8 +347,6 @@ pk11_finalize(void) {
+ 			rand_token = NULL;
+ 		if (token == best_rsa_token)
+ 			best_rsa_token = NULL;
+-		if (token == best_dsa_token)
+-			best_dsa_token = NULL;
+ 		if (token == best_dh_token)
+ 			best_dh_token = NULL;
+ 		if (token == digest_token)
+@@ -703,54 +700,35 @@ choose_slots(void) {
+ 					     &mechInfo);
+ 		if ((rv != CKR_OK) ||
+ 		    ((mechInfo.flags & CKF_GENERATE_KEY_PAIR) == 0))
+-			goto try_dsa;
++			goto try_dh;
+ 		rv = pkcs_C_GetMechanismInfo(slot, CKM_MD5_RSA_PKCS,
+ 					     &mechInfo);
+ 		if ((rv != CKR_OK) ||
+ 		    ((mechInfo.flags & CKF_SIGN) == 0) ||
+ 		    ((mechInfo.flags & CKF_VERIFY) == 0))
+-			goto try_dsa;
++			goto try_dh;
+ 		rv = pkcs_C_GetMechanismInfo(slot, CKM_SHA1_RSA_PKCS,
+ 					     &mechInfo);
+ 		if ((rv != CKR_OK) ||
+ 		    ((mechInfo.flags & CKF_SIGN) == 0) ||
+ 		    ((mechInfo.flags & CKF_VERIFY) == 0))
+-			goto try_dsa;
++			goto try_dh;
+ 		rv = pkcs_C_GetMechanismInfo(slot, CKM_SHA256_RSA_PKCS,
+ 					     &mechInfo);
+ 		if ((rv != CKR_OK) ||
+ 		    ((mechInfo.flags & CKF_SIGN) == 0) ||
+ 		    ((mechInfo.flags & CKF_VERIFY) == 0))
+-			goto try_dsa;
++			goto try_dh;
+ 		rv = pkcs_C_GetMechanismInfo(slot, CKM_SHA512_RSA_PKCS,
+ 					     &mechInfo);
+ 		if ((rv != CKR_OK) ||
+ 		    ((mechInfo.flags & CKF_SIGN) == 0) ||
+ 		    ((mechInfo.flags & CKF_VERIFY) == 0))
+-			goto try_dsa;
++			goto try_dh;
+ 		token->operations |= 1 << OP_RSA;
+ 		if (best_rsa_token == NULL)
+ 			best_rsa_token = token;
+ 
+-	try_dsa:
+-		rv = pkcs_C_GetMechanismInfo(slot, CKM_DSA_PARAMETER_GEN,
+-					     &mechInfo);
+-		if ((rv != CKR_OK) || ((mechInfo.flags & CKF_GENERATE) == 0))
+-			goto try_dh;
+-		rv = pkcs_C_GetMechanismInfo(slot, CKM_DSA_KEY_PAIR_GEN,
+-					     &mechInfo);
+-		if ((rv != CKR_OK) ||
+-		    ((mechInfo.flags & CKF_GENERATE_KEY_PAIR) == 0))
+-			goto try_dh;
+-		rv = pkcs_C_GetMechanismInfo(slot, CKM_DSA_SHA1, &mechInfo);
+-		if ((rv != CKR_OK) ||
+-		    ((mechInfo.flags & CKF_SIGN) == 0) ||
+-		    ((mechInfo.flags & CKF_VERIFY) == 0))
+-			goto try_dh;
+-		token->operations |= 1 << OP_DSA;
+-		if (best_dsa_token == NULL)
+-			best_dsa_token = token;
+-
+ 	try_dh:
+ #ifdef notdef
+ 		rv = pkcs_C_GetMechanismInfo(slot, CKM_DH_PKCS_PARAMETER_GEN,
+@@ -874,9 +852,6 @@ pk11_get_best_token(pk11_optype_t optype) {
+ 	case OP_RSA:
+ 		token = best_rsa_token;
+ 		break;
+-	case OP_DSA:
+-		token = best_dsa_token;
+-		break;
+ 	case OP_DH:
+ 		token = best_dh_token;
+ 		break;
+@@ -1234,8 +1209,6 @@ pk11_parse_uri(pk11_object_t *obj, const char *label,
+ 	if (token == NULL) {
+ 		if (optype == OP_RSA)
+ 			token = best_rsa_token;
+-		else if (optype == OP_DSA)
+-			token = best_dsa_token;
+ 		else if (optype == OP_DH)
+ 			token = best_dh_token;
+ 		else if (optype == OP_EC)
+@@ -1274,7 +1247,6 @@ pk11_dump_tokens(void)
+ 	printf("DEFAULTS\n");
+ 	printf("\trand_token=%p\n", rand_token);
+ 	printf("\tbest_rsa_token=%p\n", best_rsa_token);
+-	printf("\tbest_dsa_token=%p\n", best_dsa_token);
+ 	printf("\tbest_dh_token=%p\n", best_dh_token);
+ 	printf("\tdigest_token=%p\n", digest_token);
+ 	printf("\tbest_ec_token=%p\n", best_ec_token);
+@@ -1305,12 +1277,6 @@ pk11_dump_tokens(void)
+ 			first = ISC_FALSE;
+ 			printf("RSA");
+ 		}
+-		if (token->operations & (1 << OP_DSA)) {
+-			if (!first)
+-				printf(",");
+-			first = ISC_FALSE;
+-			printf("DSA");
+-		}
+ 		if (token->operations & (1 << OP_DH)) {
+ 			if (!first)
+ 				printf(",");
+-- 
+2.43.2
+

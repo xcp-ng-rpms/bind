@@ -1,0 +1,12 @@
+diff --git a/bin/tests/system/tkey/ns1/named.conf.in b/bin/tests/system/tkey/ns1/named.conf.in
+index 50600b7..b0f1700 100644
+--- a/bin/tests/system/tkey/ns1/named.conf.in
++++ b/bin/tests/system/tkey/ns1/named.conf.in
+@@ -32,6 +32,7 @@ options {
+ 	tkey-domain "server";
+ 	tkey-dhkey "server" KEYID;
+ 	allow-query-cache { any; };
++	random-device "/dev/urandom";
+ };
+ 
+ key rndc_key {
